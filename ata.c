@@ -311,10 +311,7 @@ static void set_device_number(int device)
 	// Device number is zero.
 	data = inb((uint16_t) DEVICE_HEAD_REGISTER);
 
-	if (!device)
-		data &= 0xf;
-	else
-		data |= 0x10;
+	data = 0xa0 | (device << 4);
 
 	outb((uint16_t) DEVICE_HEAD_REGISTER, data);
 
@@ -481,10 +478,10 @@ static bool sector_rw_common(uint8_t cmd, int device, uint32_t sector)
 	outb(FEATURES_REGISTER, 0x00);
 
 	// Set Logical Sector.
+	outb(DEVICE_HEAD_REGISTER, ((sector >> 24) & 0x0f) | 0xe0 | (device << 4));
 	outb(SECTOR_NUMBER_REGISTER, sector & 0xff);
 	outb(CYLINDER_LOW_REGISTER, (sector >> 8) & 0xff);
 	outb(CYLINDER_HIGH_REGISTER, (sector >> 16) & 0xff);
-	outb(DEVICE_HEAD_REGISTER, ((sector >> 24) & 0x1f) | 0x40 | (device << 4));
 	outb(SECTOR_COUNT_REGISTER, 1);
 
 #if 0

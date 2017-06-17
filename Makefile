@@ -7,6 +7,7 @@ DEL      = rm
 COPY     = cp
 GRUB     = grub-mkrescue
 QEMU     = qemu-system-i386
+BZIP2    = bzip2
 
 CFLAGS = -I. -Igolibc/ -fno-builtin
 CFLAGS += -fno-common -nostdlib -nostdinc -nostartfiles -nodefaultlibs 
@@ -28,6 +29,11 @@ bootcd.iso : kernel.elf Makefile
 	$(COPY) kernel.elf grub/
 	$(GRUB)  --output=bootcd.iso grub
 
+vfat.img : Makefile
+	-$(DEL) vfat.img
+	$(BZIP2) -d -k vfat.img.bz2
+	ls fs_files | xargs -I{} mcopy -i vfat.img fs_files/{} ::{}
+
 # normal rules
 
 %.o : %.c Makefile
@@ -41,8 +47,11 @@ bootcd.iso : kernel.elf Makefile
 bootcd :
 	$(MAKE) bootcd.iso
 
-run : bootcd.iso
-	$(QEMU) -hdb hdd-256mb.img -cdrom bootcd.iso -boot d
+hdimage :
+	$(MAKE) vfat.img
+
+run : bootcd.iso vfat.img
+	$(QEMU) -hda vfat.img -cdrom bootcd.iso -boot d
 	
 clean :
 	$(MAKE) -C golibc clean

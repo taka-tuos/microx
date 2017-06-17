@@ -76,7 +76,7 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 		
 		d = (struct DFDATE *)&(fil.fdate);
 		
-		printk("%c%c%c%c%c %u/%02u/%02u %02u:%02u %9lu  %s\r\n", 
+		/*printk("%c%c%c%c%c %u/%02u/%02u %02u:%02u %9lu  %s\r\n", 
 					(fil.fattrib & AM_DIR) ? 'D' : '-',
 					(fil.fattrib & AM_RDO) ? 'R' : '-',
 					(fil.fattrib & AM_HID) ? 'H' : '-',
@@ -84,6 +84,6 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 					(fil.fattrib & AM_ARC) ? 'A' : '-',
 					(fil.fdate >> 9) + 1980, (fil.fdate >> 5) & 15, fil.fdate & 31,
 					(fil.ftime >> 11), (fil.ftime >> 5) & 63,
-					fil.fsize, &(fil.fname[0]));
+					fil.fsize, &(fil.fname[0]));*/
 	}
 }

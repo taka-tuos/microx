@@ -43,7 +43,10 @@ DSTATUS disk_initialize (
 )
 {
 	if(pdrv >= 2) return STA_NOINIT;
-	if(inited == -1 && (inited = ata_dev.open()) < 0) return STA_NOINIT;
+	
+	if(inited < 0) inited = ata_dev.open();
+	
+	if(inited <= 0) return STA_NOINIT;
 	
 	if(inited & 0x01) {
 		ldrv[0] = 0;
@@ -53,6 +56,8 @@ DSTATUS disk_initialize (
 	} else if(inited & 0x02) {
 		ldrv[0] = 1;
 	}
+	
+	if(ldrv[pdrv] < 0) return STA_NOINIT;
 	
 	return 0;
 }
