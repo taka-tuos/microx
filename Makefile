@@ -9,9 +9,9 @@ GRUB     = grub-mkrescue
 QEMU     = qemu-system-i386
 BZIP2    = bzip2
 
-CFLAGS = -I. -Igolibc/ -fno-builtin
+CFLAGS = -O0 -I. -Igolibc/ -Ilibmicrox/ -fno-builtin
 CFLAGS += -fno-common -nostdlib -nostdinc -nostartfiles -nodefaultlibs 
-CFLAGS += -m32 -march=i386
+CFLAGS += -m32 -march=i386 -fno-pie
 CFLAGS += -mno-red-zone -ffreestanding -fno-stack-protector
 
 # default
@@ -29,10 +29,16 @@ bootcd.iso : kernel.elf Makefile
 	$(COPY) kernel.elf grub/
 	$(GRUB)  --output=bootcd.iso grub
 
-vfat.img : Makefile
+vfat.img : Makefile $(shell find fs_files/ -type f)
 	-$(DEL) vfat.img
 	$(BZIP2) -d -k vfat.img.bz2
-	ls fs_files | xargs -I{} mcopy -i vfat.img fs_files/{} ::{}
+	find fs_files/ -type d | cut -d/ -f2-8 | xargs -I{} mmd -i vfat.img {}
+	find fs_files/ -type f | cut -d/ -f2-8 | xargs -I{} mcopy -i vfat.img fs_files/{} ::{}
+
+app.eim : Makefile app.c
+	$(MAKE) -C libmicrox
+	$(GCC) $(CFLAGS) -Wl,-Tapp.lds,-Map=app.map -o app.eim app.c libmicrox/libmicrox.a
+	$(COPY) app.eim fs_files/
 
 # normal rules
 
@@ -50,9 +56,11 @@ bootcd :
 hdimage :
 	$(MAKE) vfat.img
 
-run : bootcd.iso vfat.img
+run : bootcd.iso app.eim vfat.img
 	$(QEMU) -hda vfat.img -cdrom bootcd.iso -boot d
 	
 clean :
 	$(MAKE) -C golibc clean
+	$(MAKE) -C libmicrox clean
 	-$(DEL) *.o
+	-$(DEL) *.eim

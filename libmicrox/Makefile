@@ -1,7 +1,4 @@
-OBJS_GOLIBC = vsprintf.o abs.o atoi.o errno.o memchr.o memcmp.o memcpy.o memmove.o \
-			memset.o qsort.o rand.o sprintf.o strcat.o strchr.o strcmp.o strcpy.o \
-			strcspn.o strlen.o strncat.o strncmp.o strncpy.o strpbrk.o strrchr.o \
-			strspn.o strstr.o strtol.o strtoul.o strtoul0.o 
+OBJS_LIB = libmicrox.o
 
 MAKE     = make -r
 GCC      = gcc
@@ -18,12 +15,12 @@ CFLAGS += -mno-red-zone -ffreestanding -fno-stack-protector
 # default
 
 default :
-	$(MAKE) golibc.a
+	$(MAKE) libmicrox.a
 
 # rules
 
-golibc.a : $(OBJS_GOLIBC) Makefile
-	$(AR) rcs golibc.a $(OBJS_GOLIBC)
+libmicrox.a : $(OBJS_LIB) Makefile
+	$(AR) rcs libmicrox.a $(OBJS_LIB)
 
 # normal rules
 
@@ -37,4 +34,4 @@ golibc.a : $(OBJS_GOLIBC) Makefile
 
 clean :
 	-$(DEL) *.o
-	-$(DEL) golibc.a
+	-$(DEL) libmicrox.a

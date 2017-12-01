@@ -16,6 +16,9 @@ void load_gdtr(int limit, int addr);
 void load_idtr(int limit, int addr);
 int read_cs(void);
 int read_ss(void);
+void asm_microx_api(void);
+void start_app(int eip, int cs, int esp, int ds, int *tss_esp0);
+void asm_end_app(void);
 
 /* fifo.c */
 struct FIFO32 {
@@ -103,8 +106,8 @@ void timer_cancelall(struct FIFO32 *fifo);
 unsigned int timer_getticks(void);
 
 /* mtask.c */
-#define MAX_TASKS		1000	/* Å‘åƒ^ƒXƒN” */
-#define TASK_GDT0		3		/* TSS‚ğGDT‚Ì‰½”Ô‚©‚çŠ„‚è“–‚Ä‚é‚Ì‚© */
+#define MAX_TASKS		1000	/* æœ€å¤§ã‚¿ã‚¹ã‚¯æ•° */
+#define TASK_GDT0		3		/* TSSã‚’GDTã®ä½•ç•ªã‹ã‚‰å‰²ã‚Šå½“ã¦ã‚‹ã®ã‹ */
 #define MAX_TASKS_LV	100
 #define MAX_TASKLEVELS	10
 struct TSS32 {
@@ -114,7 +117,7 @@ struct TSS32 {
 	int ldtr, iomap;
 };
 struct TASK {
-	int sel, flags; /* sel‚ÍGDT‚Ì”Ô†‚Ì‚±‚Æ */
+	int sel, flags; /* selã¯GDTã®ç•ªå·ã®ã“ã¨ */
 	int level, priority;
 	struct FIFO32 fifo;
 	struct TSS32 tss;
@@ -127,13 +130,13 @@ struct TASK {
 	unsigned char langmode, langbyte1;
 };
 struct TASKLEVEL {
-	int running; /* “®ì‚µ‚Ä‚¢‚éƒ^ƒXƒN‚Ì” */
-	int now; /* Œ»İ“®ì‚µ‚Ä‚¢‚éƒ^ƒXƒN‚ª‚Ç‚ê‚¾‚©•ª‚©‚é‚æ‚¤‚É‚·‚é‚½‚ß‚Ì•Ï” */
+	int running; /* å‹•ä½œã—ã¦ã„ã‚‹ã‚¿ã‚¹ã‚¯ã®æ•° */
+	int now; /* ç¾åœ¨å‹•ä½œã—ã¦ã„ã‚‹ã‚¿ã‚¹ã‚¯ãŒã©ã‚Œã ã‹åˆ†ã‹ã‚‹ã‚ˆã†ã«ã™ã‚‹ãŸã‚ã®å¤‰æ•° */
 	struct TASK *tasks[MAX_TASKS_LV];
 };
 struct TASKCTL {
-	int now_lv; /* Œ»İ“®ì’†‚ÌƒŒƒxƒ‹ */
-	char lv_change; /* Ÿ‰ñƒ^ƒXƒNƒXƒCƒbƒ`‚Ì‚Æ‚«‚ÉAƒŒƒxƒ‹‚à•Ï‚¦‚½‚Ù‚¤‚ª‚¢‚¢‚©‚Ç‚¤‚© */
+	int now_lv; /* ç¾åœ¨å‹•ä½œä¸­ã®ãƒ¬ãƒ™ãƒ« */
+	char lv_change; /* æ¬¡å›ã‚¿ã‚¹ã‚¯ã‚¹ã‚¤ãƒƒãƒã®ã¨ãã«ã€ãƒ¬ãƒ™ãƒ«ã‚‚å¤‰ãˆãŸã»ã†ãŒã„ã„ã‹ã©ã†ã‹ */
 	struct TASKLEVEL level[MAX_TASKLEVELS];
 	struct TASK tasks0[MAX_TASKS];
 };

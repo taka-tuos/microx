@@ -54,7 +54,7 @@
 #define DEF_MBH_HEADER_ADDR     DEF_MM_KERNEL_PHY_BASEADDR
 #define DEF_MBH_MODE_TYPE       0x00000001        /* text mode                  */
 #define DEF_MBH_WIDTH           0x00000050        /* width  = 80                */
-#define DEF_MBH_HEIGHT          0x00000028        /* height = 40                */
+#define DEF_MBH_HEIGHT          0x00000019        /* height = 40                */
 #define DEF_MBH_DEPTH           0x00000000
 
 #endif  /* __MULTIBOOT__H */

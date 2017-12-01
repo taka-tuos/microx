@@ -27,7 +27,7 @@ DSTATUS disk_status (
 	BYTE pdrv		/* Physical drive nmuber to identify the drive */
 )
 {
-	if(inited >= 0 && ldrv[pdrv] > 0) return 0;
+	if(ldrv[pdrv] >= 0) return 0;
 
 	return STA_NOINIT;
 }

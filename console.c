@@ -3,18 +3,16 @@
 
 void cons_putchar_hw(int x, int y, unsigned char f, unsigned char b, int c)
 {
-	unsigned short	*vram_textmode;
-	unsigned short	color;
+	((unsigned char *)VRAM_TEXTMODE)[(x + y * MAX_X) * 2 + 0] = c;
+	((unsigned char *)VRAM_TEXTMODE)[(x + y * MAX_X) * 2 + 1] = 7;
+}
+
+void cons_applycursor(struct CONSOLE *cons)
+{
+	int x = cons->cur_x;
+	int y = cons->cur_y;
 	
-	vram_textmode	= ( unsigned short *)VRAM_TEXTMODE;
-	
-	color = ( b << 4 ) | ( f & 0x0F );
-	
-	vram_textmode	+= x + y * MAX_X;
-	
-	*vram_textmode	= ( color << 8 ) | c;
-	
-	int postion = (x + 1) + y * MAX_X;
+	int postion = x + y * MAX_X;
 	
 	io_out8(0x3d4, 0xf);
 	io_out8(0x3d5, postion & 0xff);
@@ -25,7 +23,7 @@ void cons_putchar_hw(int x, int y, unsigned char f, unsigned char b, int c)
 
 void cons_putchar(struct CONSOLE *cons, int chr, char move)
 {
-	if (chr == 0x09) {	/* ƒ^ƒu */
+	if (chr == 0x09) {	/* ã‚¿ãƒ– */
 		for (;;) {
 			cons_putchar_hw(cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, ' ');
 			cons->cur_x++;
@@ -33,23 +31,24 @@ void cons_putchar(struct CONSOLE *cons, int chr, char move)
 				cons_newline(cons);
 			}
 			if (((cons->cur_x - 1) & 3) == 0) {
-				break;	/* 32‚ÅŠ„‚èØ‚ê‚½‚çbreak */
+				break;	/* 32ã§å‰²ã‚Šåˆ‡ã‚ŒãŸã‚‰break */
 			}
 		}
-	} else if (chr == 0x0a) {	/* ‰üs */
+	} else if (chr == 0x0a) {	/* æ”¹è¡Œ */
 		cons_newline(cons);
-	} else if (chr == 0x0d) {	/* •œ‹A */
-		/* ‚Æ‚è‚ ‚¦‚¸‚È‚É‚à‚µ‚È‚¢ */
-	} else {	/* •’Ê‚Ì•¶š */
+	} else if (chr == 0x0d) {	/* å¾©å¸° */
+		/* ã¨ã‚Šã‚ãˆãšãªã«ã‚‚ã—ãªã„ */
+	} else {	/* æ™®é€šã®æ–‡å­— */
 		cons_putchar_hw(cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, chr);
 		if (move != 0) {
-			/* move‚ª0‚Ì‚Æ‚«‚ÍƒJ[ƒ\ƒ‹‚ği‚ß‚È‚¢ */
+			/* moveãŒ0ã®ã¨ãã¯ã‚«ãƒ¼ã‚½ãƒ«ã‚’é€²ã‚ãªã„ */
 			cons->cur_x++;
 			if (cons->cur_x == 80) {
 				cons_newline(cons);
 			}
 		}
 	}
+	cons_applycursor(cons);
 	return;
 }
 
@@ -57,9 +56,9 @@ void cons_newline(struct CONSOLE *cons)
 {
 	int x, y;
 	if (cons->cur_y < 25 - 1) {
-		cons->cur_y++; /* Ÿ‚Ìs‚Ö */
+		cons->cur_y++; /* æ¬¡ã®è¡Œã¸ */
 	} else {
-		/* ƒXƒNƒ[ƒ‹ */
+		/* ã‚¹ã‚¯ãƒ­ãƒ¼ãƒ« */
 		for (y = 0; y < MAX_Y - 1; y++) {
 			for (x = 0; x < MAX_X; x++) {
 				((unsigned short *)VRAM_TEXTMODE)[x + y * MAX_X] = ((unsigned short *)VRAM_TEXTMODE)[x + (y + 1) * MAX_X];

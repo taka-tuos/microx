@@ -1,12 +1,12 @@
 #ifndef __MMU__
 #define __MMU__
 
-#define MEMMAN_FREES		4096	/* ‚±‚ê‚Å–ñ32KB */
+#define MEMMAN_FREES		4096	/* ã“ã‚Œã§ç´„32KB */
 #define MEMMAN_ADDR			0x003c0000
-struct FREEINFO {	/* ‚ ‚«î•ñ */
+struct FREEINFO {	/* ã‚ãæƒ…å ± */
 	unsigned int addr, size;
 };
-struct MEMMAN {		/* ƒƒ‚ƒŠŠÇ— */
+struct MEMMAN {		/* ãƒ¡ãƒ¢ãƒªç®¡ç† */
 	int frees, maxfrees, lostsize, losts;
 	struct FREEINFO free[MEMMAN_FREES];
 };

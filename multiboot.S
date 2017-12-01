@@ -2,8 +2,15 @@
 #include "multiboot.h"
 
 .extern _kernel_entry
+.extern microx_api
 
-.text
+.section .bss
+.align 16
+stack_bottom:
+.skip 65536
+stack_top:
+
+.section .text
 .code32
 .globl start, _start
 
@@ -24,7 +31,8 @@ _multi_boot_entry:
     pushl   $0
     popf
 
-    .comm stack, 0x40000, 32
+    movl $stack_top, %esp
+    
     pushl   %ebx    # 1st argument
     pushl   %eax    # 2nd argument
 
@@ -44,6 +52,7 @@ loop_infinite:
 .global load_tr, farjmp
 .global load_gdtr, load_idtr
 .global read_cs, read_ss
+.global asm_microx_api, start_app
 
 io_in8:		# void io_in8(int port)
 	movl	4(%esp), %edx	#port
@@ -117,6 +126,51 @@ asm_inthandler21:
 	popw	%ds
 	popw	%es
 	iret
+
+asm_microx_api: 
+	sti
+	pushl	%ds
+	pushl	%es
+	pushal
+	pushal 
+	movw	%ss,%ax
+	movw	%ax,%ds
+	movw	%ax,%es
+	call	microx_api
+	cmpl	$0,%eax
+	jne		asm_end_app
+	addl	$32,%esp
+	popal
+	popl	%es
+	popl	%ds
+	iretl
+asm_end_app: 
+	movl            (%eax),%esp
+	movl            $0,4(%eax)
+	popal
+	ret
+
+start_app:
+	pushal
+	movl	36(%esp),%eax
+	movl	40(%esp),%ecx
+	movl	44(%esp),%edx
+	movl	48(%esp),%ebx
+	movl	52(%esp),%ebp
+	movl	%esp,(%ebp)
+	movw	%ss,4(%ebp)
+	movw	%bx,%es
+	movw	%bx,%ds
+	movw	%bx,%fs
+	movw	%bx,%gs
+	
+	orl		$3,%ecx
+	orl		$3,%ebx
+	pushl	%ebx
+	pushl	%edx
+	pushl	%ecx
+	pushl	%eax
+	lret
 
 io_hlt:		# void io_hlt()
 	hlt

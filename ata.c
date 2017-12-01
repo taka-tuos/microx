@@ -179,7 +179,7 @@ int read_sector(int device, uint32_t sector,
 	bool ret;
 	size_t i;
 
-	printk("DEVICE %d LBA 0x%08x READ\n", device, sector);
+	//printk("DEVICE %d LBA 0x%08x READ\n", device, sector);
 	
 	if (buf_size != 256) {
 		printk("buf_size isn't 256\n");
@@ -192,6 +192,13 @@ int read_sector(int device, uint32_t sector,
 
 	for (i = 0; i < buf_size; i++)
 		buf[i] = inw(DATA_REGISTER);
+		
+	/*unsigned char *ubuf = (unsigned char *)buf;
+	for (i = 0; i < 128; i+=16) {
+		for (int j = 0; j < 16; j++) printk("%02X ",ubuf[i+j]);
+		for (int j = 0; j < 16; j++) printk("%c",ubuf[i+j] < 0x20 ? '.' : ubuf[i+j]);
+		printk("\n");
+	}*/
 
 	finish_sector_rw();
 
@@ -694,7 +701,7 @@ static bool initialize_ata(void)
 	ata_disk_inited[0] = ret1 ? 1 : 0;
 	ata_disk_inited[1] = ret2 ? 1 : 0;
 
-	return ret1 || ret2;
+	return ret1 | (ret2 << 1);
 }
 
 /////////////////////////////////////////////////
