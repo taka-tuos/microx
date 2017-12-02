@@ -26,3 +26,4 @@ $(TARGET).a : $(OBJS) Makefile
 clean :
 	-$(DEL) *.o
 	-$(DEL) $(TARGET).a
+	-$(DEL) ../$(TARGET).a

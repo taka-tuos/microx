@@ -1,26 +1,42 @@
 #include <libmicrox.h>
 #include <stdio.h>
 
-void putc(int c)
-{
-	int p[32];
-	p[0] = mx32api_putchar;
-	p[1] = c;
-	mx32api_call(p);
-}
-
-void puts(char *s)
-{
-	while(*s) putc(*s++);
-}
+#include "xprintf.h"
 
 void HariMain(void)
 {
-	int i = 0;
-	while(1) {
-		char s[256];
-		sprintf(s,"hello,world %d\n", i);
-		puts(s);
-		i++;
+	DIR Dir;
+	FILINFO Finfo;
+	
+	int res,p1,s1,s2;
+	res = f_opendir(&Dir,"/");
+	
+	xdev_out(putc);
+	
+	if (res) {
+		puts("opendir failed");
+		exit();
 	}
+	p1 = s1 = s2 = 0;
+	for(;;) {
+		res = f_readdir(&Dir, &Finfo);
+		if ((res != FR_OK) || !Finfo.fname[0]) break;
+		if (Finfo.fattrib & AM_DIR) {
+			s2++;
+		} else {
+			s1++; p1 += Finfo.fsize;
+		}
+		xprintf("%c%c%c%c%c %u/%02u/%02u %02u:%02u %9lu  %s\n", 
+				(Finfo.fattrib & AM_DIR) ? 'D' : '-',
+				(Finfo.fattrib & AM_RDO) ? 'R' : '-',
+				(Finfo.fattrib & AM_HID) ? 'H' : '-',
+				(Finfo.fattrib & AM_SYS) ? 'S' : '-',
+				(Finfo.fattrib & AM_ARC) ? 'A' : '-',
+				(Finfo.fdate >> 9) + 1980, (Finfo.fdate >> 5) & 15, Finfo.fdate & 31,
+				(Finfo.ftime >> 11), (Finfo.ftime >> 5) & 63,
+				Finfo.fsize, &(Finfo.fname[0]));
+	}
+	xprintf("%4u File(s),%10lu bytes\n%4u Dir(s)", s1, p1, s2);
+	
+	exit();
 }

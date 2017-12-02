@@ -1,5 +1,5 @@
 TARGET = init
-LIBS = -lc -lmicrox
-OBJS = init.o
+LIBS = -lmicrox -lc
+OBJS = init.o xprintf.o
 
 include ../app.mk

@@ -13,7 +13,7 @@ default :
 
 kernel.elf : $(OBJS_KERNEL) Makefile
 	$(MAKE) -C ../lib
-	$(LD) -m elf_i386 -Ttext=0x100000 -L../lib/ -Map kernel.map $(OBJS_KERNEL) -lc -lmicrox -o kernel.elf
+	$(LD) -m elf_i386 -Ttext=0x100000 -L../lib/ -Map kernel.map $(OBJS_KERNEL) -lc -o kernel.elf
 
 # normal rules
 

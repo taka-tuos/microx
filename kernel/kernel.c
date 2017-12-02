@@ -6,6 +6,7 @@
 #include "bootpack.h"
 #include "ff.h"
 
+#define __KERNEL__
 #include <libmicrox.h>
 
 #define DUMP(v) printk(#v " = %08x\n", v);
@@ -13,6 +14,10 @@
 struct CONSOLE *cons;
 
 FATFS *ata;
+
+struct FIFO32 ***fifo_list;
+
+#define KEYCMD_LED		0xed
 
 void fork_exit(void)
 {
@@ -73,6 +78,9 @@ void fork_task(char *path)
 	} else {
 		printk("%s not found\n", path);
 	}
+	
+	for(int t = 0; t < FIFOTYPE_NUM; t++)
+		for(int l = 0; l < 1024; l++) if(fifo_list[t][l] == &task->fifo) fifo_list[t][l] = 0;
 	
 	fork_exit();
 }
@@ -146,11 +154,62 @@ void set_palette(int start, int end, unsigned char *rgb)
 	return;
 }
 
+#define PS2_TAB                      9
+#define PS2_ENTER                    13
+#define PS2_BACKSPACE                127
+#define PS2_ESC                      27
+#define PS2_INSERT                   '^'
+#define PS2_DELETE                   '~' 
+#define PS2_HOME                     'H'
+#define PS2_END                      'F'
+#define PS2_PAGEUP                   '^'
+#define PS2_PAGEDOWN                 '^'
+#define PS2_UPARROW                  'A'
+#define PS2_LEFTARROW                'D'
+#define PS2_DOWNARROW                'B'
+#define PS2_RIGHTARROW               'C'
+
+#define BREAK     0x0001
+#define MODIFIER  0x0002
+#define SHIFT_L   0x0004
+#define SHIFT_R   0x0008
+#define CAPS      0x0010
+#define ALT       0x0020
+#define CTRL      0x0040
+#define SCROLL    0x0080
+#define NUM	      0x0100
+
+const int keytable[2][128] = {
+	{
+		'\0', '\e', '1' , '2' , '3' , '4' , '5' , '6' , '7' , '8' , '9' , '0' , '-' , '^' , '\b', '\t',
+		'q' , 'w' , 'e' , 'r' , 't' , 'y' , 'u' , 'i' , 'o' , 'p' , '@' , '[' , '\n', '\0', 'a' , 's' ,
+		'd' , 'f' , 'g' , 'h' , 'j' , 'k' , 'l' , ';' , ':' , '`' , '\0', ']' , 'z' , 'x' , 'c' , 'v' ,
+		'b' , 'n' , 'm' , ',' , '.' , '/' , '\0', '*' , '\0', ' ' , '\0', '\0', '\0', '\0', '\0', '\0',
+		'\0', '\0', '\0', '\0', '\0', '\0', '\0', '7' , '8' , '9' , '-' , '4' , '5' , '6' , '+' , '1' ,
+		'2' , '3' , '0' , '.' , '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+		'\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+		'\0', '\0', '\0', '_' , '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\\', '\0', '\0',
+	},
+	{
+		'\0', '\e', '!' , '\"', '#' , '$' , '%' , '&' , '\'', '(' , ')' , '\0', '=' , '~' , '\b', '\t',
+		'Q' , 'W' , 'E' , 'R' , 'T' , 'Y' , 'U' , 'I' , 'O' , 'P' , '`' , '{' , '\n', '\0', 'A' , 'S' ,
+		'D' , 'F' , 'G' , 'H' , 'J' , 'K' , 'L' , '+' , '*' , '`' , '\0', '}' , 'Z' , 'X' , 'C' , 'V' ,
+		'B' , 'N' , 'M' , '<' , '>' , '?' , '\0', '*' , '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+		'\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '-' , '\0', '\0', '\0', '+' , '\0',
+		'\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+		'\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+		'\0', '\0', '\0', '_' , '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\\', '\0', '\0',
+	}
+};
+
 void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 {
 	struct FIFO32 fifo, keycmd;
 	int fifobuf[128], keycmd_buf[32];
 	struct TASK *task_a, *task;
+	int key_shift = 0, key_leds = 0, keycmd_wait = -1;
+	
+	struct FIFO32 *fifolist_buf[FIFOTYPE_NUM][1024];
 	
 	FATFS fs;
 	
@@ -173,6 +232,8 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 	task_a = task_init(memman);
 	fifo.task = task_a;
 	task_run(task_a, 1, 2);
+	
+	fifo_list = fifolist_buf;
 	
 	cons = (struct CONSOLE *) memman_alloc_4k(memman, sizeof(struct CONSOLE));
 	
@@ -228,6 +289,9 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 	
 	memset(0xa0000,0,640*480/8);
 	
+	for(int t = 0; t < FIFOTYPE_NUM; t++)
+		for(int l = 0; l < 1024; l++) fifo_list[t][l] = 0;
+	
 	find_pci_device();
 	init_ata_disk_driver();
 	
@@ -237,12 +301,138 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 	
 	fork("init.eim");
 	
+	int ps2_skip = 0;
+	int ps2_state = 0;
+	
 	while(1)
 	{
 		if(fifo32_status(&fifo) != 0) {
 			i = fifo32_get(&fifo);
 			if (1024 <= i && i <= 2023) {
 				kill_fork(taskctl->tasks0 + (i - 1024));
+			}
+			if (256 <= i && i <= 511) {
+				int c = 0;
+				char *esc = 0;
+				int d = i - 256;
+				if(d == 0xe0) {
+					ps2_state |= MODIFIER;
+				} else if (d >= 0x80) {
+					d = d - 0x80;
+					if(d == 0x2a) {
+						ps2_state &= ~SHIFT_L;
+					} else if(d == 0x36) {
+						ps2_state &= ~SHIFT_R;
+					} else if(d == 0x38) {
+						ps2_state &= ~ALT;
+					} else if(d == 0x1d) {
+						ps2_state &= ~CTRL;
+					}
+					ps2_state &= ~MODIFIER;
+				} else {
+					if(d == 0x2a) {
+						ps2_state |= SHIFT_L;
+					} else if(d == 0x36) {
+						ps2_state |= SHIFT_R;
+					} else if(d == 0x38) {
+						ps2_state |= ALT;
+					} else if(d == 0x1d) {
+						ps2_state |= CTRL;
+					} else if(d == 0x3a && (ps2_state & (SHIFT_L |SHIFT_R))) {
+						ps2_state ^= CAPS;
+					} else if(d == 0x45) {
+						ps2_state ^= NUM;
+					} else if(d == 0x46) {
+						ps2_state ^= SCROLL;
+					}
+					if((ps2_state & MODIFIER) || (d >= 0x47 && d <= 0x53 && ((ps2_state & NUM) == 0 || (ps2_state & (SHIFT_L |SHIFT_R))))) {
+						esc = "\e[";
+						switch (d) {
+							case 0x52:
+								esc = "\e[2";
+								c = PS2_INSERT;
+								break;
+							case 0x47:
+								c = PS2_HOME;
+								break;
+							case 0x49:
+								esc = "\e[5";
+								c = PS2_PAGEUP;
+								break;
+							case 0x53:
+								esc = "\e[3";
+								c = PS2_DELETE;
+								break;
+							case 0x4f:
+								c = PS2_END;
+								break;
+							case 0x51:
+								esc = "\e[6";
+								c = PS2_PAGEDOWN;
+								break;
+							case 0x48:
+								c = PS2_UPARROW;
+								break;
+							case 0x4b:
+								c = PS2_LEFTARROW;
+								break;
+							case 0x50:
+								c = PS2_DOWNARROW;
+								break;
+							case 0x4d:
+								c = PS2_RIGHTARROW;
+								break;
+							case 0x35:
+								c = '/';
+								esc = 0;
+								break;
+							case 0x1c:
+								c = PS2_ENTER;
+								break;
+							default:
+								break;
+						}
+					} else {
+						int addr = (ps2_state & (SHIFT_L | SHIFT_R)) ? 1 : 0;
+						c = keytable[addr][d];
+						if(ps2_state & CAPS)
+							if(c >= 'a' && c <= 'z') c -= 0x20;
+						if((d >= 0x3b && d <= 0x44) || d == 0x57 || d == 0x58) {
+							int fx = d >= 0x57 ? d - 0x57 + 10 : d - 0x3b;
+							esc = fx > 8 ? "\e2" : "\e1";
+							c = "123457890134"[fx];
+						}
+					}
+					if(ps2_state & CTRL) {
+						if(c >= 'a' && c <= 'z') c = c - 'a' + 1;
+					}
+					ps2_state &= ~MODIFIER;
+				}
+				
+				struct FIFO32 **fp = fifo_list[FIFOTYPE_KEYBOARD];
+				for(i = 0; i < 1024; i++) {
+					if(fp[i]) {
+						struct FIFO32 *fifo = fp[i];
+						char *p = esc;
+						if(!fifo->task->flags) continue;
+						while(*p && p) {
+							fifo32_put(fifo, FIFOTYPE_KEYBOARD);
+							fifo32_put(fifo, *p++);
+						}
+						if(c) {
+							fifo32_put(fifo, FIFOTYPE_KEYBOARD);
+							fifo32_put(fifo, c);
+						}
+					}
+				}
+				
+				// CNS 421
+				key_leds = 0;
+				key_leds |= (ps2_state & CAPS) * 4;
+				key_leds |= (ps2_state & NUM) * 2;
+				key_leds |= (ps2_state & SCROLL) * 1;
+				fifo32_put(&keycmd, KEYCMD_LED);
+				fifo32_put(&keycmd, key_leds);
 			}
 		} else {
 			task_sleep(task_a);
@@ -257,10 +447,130 @@ int *microx_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, i
 	int ds_base = task->ds_base;
 	int *reg = &eax + 1;
 	
+	struct FIFO32 *fifo = &task->fifo;
+	
 	int *p = (int *)(ds_base + eax);
 	
-	if(p[0] == mx32api_putchar) {
+	int id = p[0];
+	
+	if(id == mx32api_putchar) {
 		printk("%c",p[1] & 0xff);
+	} else if(id == mx32api_exit) {
+		return &(task->tss.esp0);
+	} else if(id == mx32api_fifo32_status) {
+		p[1] = fifo32_status(fifo);
+	} else if(id == mx32api_fifo32_put) {
+		p[2] = fifo32_put(fifo,p[1]);
+	} else if(id == mx32api_fifo32_get) {
+		p[1] = fifo32_get(fifo);
+	} else if(id == mx32api_fifo_typeenable) {
+		int type = p[1];
+		struct FIFO32 **fp = fifo_list[type];
+		for(int i = 0; i < 1024; i++) {
+			if(fp[i] == 0) {
+				fp[i] = fifo;
+				break;
+			}
+		}
+	} else if(id == mx32api_fifo_typedisable) {
+		int type = p[1];
+		struct FIFO32 **fp = fifo_list[type];
+		for(int i = 0; i < 1024; i++) {
+			if(fp[i] == fifo) {
+				fp[i] = 0;
+				break;
+			}
+		}
+	} else if(id >= mx32api_open && id <= mx32api_fgets) {
+		switch(id) {
+		case mx32api_open:
+			p[15] = f_open(p[1]+ds_base,p[2]+ds_base,p[3]);
+			break;
+
+		case mx32api_close:
+			p[15] = f_close(p[1]+ds_base);
+			break;
+
+		case mx32api_read:
+			p[15] = f_read(p[1]+ds_base,p[2]+ds_base,p[3],p[4]+ds_base);
+			break;
+
+		case mx32api_write:
+			p[15] = f_write(p[1]+ds_base,p[2]+ds_base,p[3],p[4]+ds_base);
+			break;
+
+		case mx32api_lseek:
+			p[15] = f_lseek(p[1]+ds_base,p[2]);
+			break;
+
+		case mx32api_truncate:
+			p[15] = f_truncate(p[1]+ds_base);
+			break;
+
+		case mx32api_sync:
+			p[15] = f_sync(p[1]+ds_base);
+			break;
+
+		case mx32api_opendir:
+			//printk("opendir\n");
+			//DUMP(p[1]+ds_base)
+			//DUMP(p[2]+ds_base)
+			p[15] = f_opendir(p[1]+ds_base,p[2]+ds_base);
+			//DUMP(p[15])
+			break;
+
+		case mx32api_closedir:
+			p[15] = f_closedir(p[1]+ds_base);
+			break;
+
+		case mx32api_readdir:
+			//printk("readdir\n");
+			//DUMP(p[1]+ds_base)
+			//DUMP(p[2]+ds_base)
+			p[15] = f_readdir(p[1]+ds_base,p[2]+ds_base);
+			//DUMP(p[15])
+			break;
+
+		case mx32api_mkdir:
+			p[15] = f_mkdir(p[1]+ds_base);
+			break;
+
+		case mx32api_unlink:
+			p[15] = f_unlink(p[1]+ds_base);
+			break;
+
+		case mx32api_rename:
+			p[15] = f_rename(p[1]+ds_base,p[2]+ds_base);
+			break;
+
+		case mx32api_stat:
+			p[15] = f_stat(p[1]+ds_base,p[2]+ds_base);
+			break;
+
+		case mx32api_chdir:
+			p[15] = f_chdir(p[1]+ds_base);
+			break;
+
+		case mx32api_chdrive:
+			p[15] = f_chdrive(p[1]+ds_base);
+			break;
+
+		case mx32api_getcwd:
+			p[15] = f_getcwd(p[1]+ds_base,p[2]);
+			break;
+
+		case mx32api_fputc:
+			p[15] = f_putc(p[1],p[2]+ds_base);
+			break;
+
+		case mx32api_fputs:
+			p[15] = f_puts(p[1]+ds_base,p[2]+ds_base);
+			break;
+
+		case mx32api_fgets:
+			p[15] = f_gets(p[1]+ds_base,p[2],p[3]+ds_base)-ds_base;
+			break;
+		}
 	}
 	
 	return 0;
