@@ -144,6 +144,12 @@ struct TASK *task_alloc(void)
 			task->tss.gs = 0;
 			task->tss.iomap = 0x40000000;
 			task->tss.ss0 = 0;
+			task->fpu[0] = 0x037f; /* CW(control word) */
+			task->fpu[1] = 0x0000; /* SW(status word)  */
+			task->fpu[2] = 0xffff; /* TW(tag word)     */
+			for (i = 3; i < 108 / 4; i++) {
+				task->fpu[i] = 0;
+			}
 			return task;
 		}
 	}
@@ -207,4 +213,20 @@ void task_switch(void)
 		farjmp(0, new_task->sel);
 	}
 	return;
+}
+
+int *inthandler07(int *esp)
+{
+	struct TASK *now = task_now();
+	io_cli();
+	clts();
+	if (taskctl->task_fpu != now) {
+		if (taskctl->task_fpu != 0) {
+			fnsave(taskctl->task_fpu->fpu);
+		}
+		frstor(now->fpu);
+		taskctl->task_fpu = now;
+	}
+	io_sti();
+	return 0;
 }

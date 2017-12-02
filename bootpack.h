@@ -6,6 +6,7 @@ void io_hlt(void);
 void io_cli(void);
 void io_sti(void);
 void io_stihlt(void);
+void asm_inthandler07(void);
 void asm_inthandler20(void);
 void asm_inthandler21(void);
 int io_load_eflags(void);
@@ -121,12 +122,10 @@ struct TASK {
 	int level, priority;
 	struct FIFO32 fifo;
 	struct TSS32 tss;
+	int fpu[108 / 4];
 	struct SEGMENT_DESCRIPTOR ldt[2];
-	struct CONSOLE *cons;
 	int ds_base, cons_stack;
 	struct FILEHANDLE *fhandle;
-	int *fat;
-	char *cmdline;
 	unsigned char langmode, langbyte1;
 };
 struct TASKLEVEL {
@@ -137,6 +136,7 @@ struct TASKLEVEL {
 struct TASKCTL {
 	int now_lv; /* 現在動作中のレベル */
 	char lv_change; /* 次回タスクスイッチのときに、レベルも変えたほうがいいかどうか */
+	struct TASK *task_fpu;
 	struct TASKLEVEL level[MAX_TASKLEVELS];
 	struct TASK tasks0[MAX_TASKS];
 };

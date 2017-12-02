@@ -4,9 +4,9 @@
 #define	VRAM_TEXTMODE		0x000B8000
 #define	DEF_COLOR_BLACK		0x00
 #define	DEF_COLOR_WHITE		0x07
-#define	MAX_Y				25
+#define	MAX_Y				30
 #define	MAX_X				80
-#define	MAX_XY				(80*25)
+#define	MAX_XY				(80*30)
 
 struct CONSOLE {
 	int cur_x, cur_y;

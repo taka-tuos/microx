@@ -4,6 +4,8 @@
 .extern _kernel_entry
 .extern microx_api
 
+.extern inthandler20, inthandler21, inthandler07
+
 .section .bss
 .align 16
 stack_bottom:
@@ -53,6 +55,7 @@ loop_infinite:
 .global load_gdtr, load_idtr
 .global read_cs, read_ss
 .global asm_microx_api, start_app
+.global asm_inthandler07, clts, fnsave, frstor
 
 io_in8:		# void io_in8(int port)
 	movl	4(%esp), %edx	#port
@@ -227,3 +230,36 @@ read_cs:	# int read_cs(void)
 read_ss:	# int read_ss(void)
 	movl	%ss, %eax
 	ret
+
+clts:	# void clts(void);
+	clts
+	ret
+
+fnsave:	# void fnsave(int *addr);
+	movl	4(%esp),%eax            # addr
+	fnsave	(%eax)
+	ret
+
+frstor:	# void frstor(int *addr);
+	movl	4(%esp),%eax            # addr
+	frstor	(%eax)
+	ret
+
+asm_inthandler07: 
+	sti
+	pushl	%es
+	pushl	%ds
+	pushal
+	movl	%esp,%eax
+	pushl   %eax
+	movw	%ss,%ax
+	movw	%ax,%ds
+	movw	%ax,%es
+	call	inthandler07
+	cmpl	$0,%eax
+	jne		asm_end_app
+	popl	%eax
+	popal
+	popl	%ds
+	popl	%es
+	iretl

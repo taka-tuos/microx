@@ -8,11 +8,26 @@
 
 #include <libmicrox.h>
 
+#define DUMP(v) printk(#v " = %08x\n", v);
+
 struct CONSOLE *cons;
 
 FATFS *ata;
 
-void fork_sub(char *fname)
+void fork_exit(void)
+{
+	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
+	struct TASK *task = task_now();
+	struct FIFO32 *fifo = (struct FIFO32 *) *((int *) 0x0fec);
+	io_cli();
+	fifo32_put(fifo, task - taskctl->tasks0 + 1024);	/* 1024〜2023 */
+	io_sti();
+	for (;;) {
+		task_sleep(task);
+	}
+}
+
+void fork_task(char *path)
 {
 	int i, segsiz, datsiz, esp, dathrb, appsiz;
 	char *p, *q;
@@ -23,53 +38,112 @@ void fork_sub(char *fname)
 	
 	fd = (FIL *) memman_alloc_4k(memman, sizeof(FIL));
 	
-	f_open(fd,fname,FA_READ);
+	int r = f_open(fd,path,FA_READ);
 	
-	printk("fd = %d\n",fd);
-	
-	//while(1);
-	
-	appsiz = f_size(fd);
-	p = (char *) memman_alloc_4k(memman, appsiz);
-	f_read(fd, p, appsiz, &dmy);
-	
-	if (appsiz >= 36 && strncmp(p + 4, "Hari", 4) == 0 && *p == 0x00) {
-		segsiz = *((int *) (p + 0x0000));
-		esp    = *((int *) (p + 0x000c));
-		datsiz = *((int *) (p + 0x0010));
-		dathrb = *((int *) (p + 0x0014));
-		q = (char *) memman_alloc_4k(memman, segsiz);
-		task->ds_base = (int) q;
+	if(r == FR_OK) {
+		appsiz = f_size(fd);
+		p = (char *) memman_alloc_4k(memman, appsiz);
+		f_read(fd, p, appsiz, &dmy);
 		
-		printk("ldt = %08x\n\n",task->ldt);
-		
-		printk("segsiz = %08x\n",segsiz);
-		printk("esp = %08x\n",esp);
-		printk("datsiz = %08x\n",datsiz);
-		printk("dathrb = %08x\n",dathrb);
-		
-		set_segmdesc(task->ldt + 0, appsiz + 1024 - 1, (int) p, AR_CODE32_ER + 0x60);
-		set_segmdesc(task->ldt + 1, segsiz + 1024 - 1, (int) q, AR_DATA32_RW + 0x60);
-		for (i = 0; i < datsiz; i++) {
-			q[esp + i] = p[dathrb + i];
+		if (appsiz >= 36 && strncmp(p + 4, "Hari", 4) == 0 && *p == 0x00) {
+			segsiz = *((int *) (p + 0x0000));
+			esp    = *((int *) (p + 0x000c));
+			datsiz = *((int *) (p + 0x0010));
+			dathrb = *((int *) (p + 0x0014));
+			q = (char *) memman_alloc_4k(memman, segsiz);
+			task->ds_base = (int) q;
+			
+			//DUMP(segsiz);
+			//DUMP(esp);
+			//DUMP(datsiz);
+			//DUMP(dathrb);
+			
+			set_segmdesc(task->ldt + 0, appsiz + 1024 - 1, (int) p, AR_CODE32_ER + 0x60);
+			set_segmdesc(task->ldt + 1, segsiz + 1024 - 1, (int) q, AR_DATA32_RW + 0x60);
+			for (i = 0; i < datsiz; i++) {
+				q[esp + i] = p[dathrb + i];
+			}
+			
+			start_app(0x1b, 0 * 8 + 4, esp, 1 * 8 + 4, &(task->tss.esp0));
+			memman_free_4k(memman, (int) q, segsiz);
+		} else {
+			printk("%s is not executable file\n", path);
 		}
-		
-		//printk("dathrb = %08x\n",dathrb);
-		
-		unsigned char *up = (unsigned char *)p;
-		
-		for (i = 0; i < appsiz; i+=16) {
-			for (int j = 0; j < 16; j++) if(appsiz - i < j) printk("   "); else printk("%02X ",up[i+j]);
-				for (int j = 0; j < 16; j++) if(appsiz - i < j) printk(" "); else printk("%c",up[i+j] < 0x20 ? '.' : up[i+j]);
-			printk("\n");
-		}
-		
-		start_app(0x1b, 0 * 8 + 4, esp, 1 * 8 + 4, &(task->tss.esp0));
-		memman_free_4k(memman, (int) q, segsiz);
+		memman_free_4k(memman, (int) p, appsiz);
 	} else {
-		printk(".eim file format error\n");
+		printk("%s not found\n", path);
 	}
-	memman_free_4k(memman, (int) p, appsiz);
+	
+	fork_exit();
+}
+
+struct TASK *fork(char *path)
+{
+	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
+	struct TASK *forktask = task_alloc();
+	int *fork_fifo = (int *) memman_alloc_4k(memman, 128 * 4);
+	forktask->tss.esp = memman_alloc_4k(memman, 64 * 1024) + 64 * 1024 - 8;
+	forktask->tss.eip = (int) &fork_task;
+	forktask->tss.es = 1 * 8;
+	forktask->tss.cs = 2 * 8;
+	forktask->tss.ss = 1 * 8;
+	forktask->tss.ds = 1 * 8;
+	forktask->tss.fs = 1 * 8;
+	forktask->tss.gs = 1 * 8;
+	*((char **) (forktask->tss.esp + 4)) = path;
+	task_run(forktask, 1, 2);
+	fifo32_init(&(forktask->fifo), 128, fork_fifo, forktask);
+}
+
+const unsigned char table_rgb[16 * 3] = {
+	0x00, 0x00, 0x00,
+	0x00, 0x00, 0xaa,
+	0x00, 0xaa, 0x00,
+	0x00, 0xaa, 0xaa,
+	0xaa, 0x00, 0x00,
+	0xaa, 0x00, 0xaa,
+	0xaa, 0xaa, 0x00,
+	0xaa, 0xaa, 0xaa,
+	0x55, 0x55, 0x55,
+	0x55, 0x55, 0xff,
+	0x55, 0xff, 0x55,
+	0x55, 0xff, 0xff,
+	0xff, 0x55, 0x55,
+	0xff, 0x55, 0xff,
+	0xff, 0xff, 0x55,
+	0xff, 0xff, 0xff,
+};
+
+void kill_fork(struct TASK *task)
+{
+	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
+	task_sleep(task);
+	memman_free_4k(memman, task->cons_stack, 64 * 1024);
+	memman_free_4k(memman, (int) task->fifo.buf, 128 * 4);
+	io_cli();
+	task->flags = 0;
+	if (taskctl->task_fpu == task) {
+		taskctl->task_fpu = 0;
+	}
+	io_sti();
+	task->flags = 0;
+	return;
+}
+
+
+void set_palette(int start, int end, unsigned char *rgb)
+{
+	int i, eflags;
+	io_cli();
+	io_out8(0x03c8, start);
+	for (i = start; i <= end; i++) {
+		io_out8(0x03c9, rgb[0] / 4);
+		io_out8(0x03c9, rgb[1] / 4);
+		io_out8(0x03c9, rgb[2] / 4);
+		rgb += 3;
+	}
+	io_sti();
+	return;
 }
 
 void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
@@ -94,53 +168,86 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
 	int memtotal = info->mem_upper;
 	memman_init(memman);
-	//memman_free(memman, 0x00001000, 0x0009e000); /* 0x00001000 - 0x0009efff */
 	memman_free(memman, 0x00400000, memtotal - 0x00400000);
 	
 	task_a = task_init(memman);
 	fifo.task = task_a;
 	task_run(task_a, 1, 2);
 	
-	//memset(0xb8000,0x07,80*25*2);
-	
 	cons = (struct CONSOLE *) memman_alloc_4k(memman, sizeof(struct CONSOLE));
 	
-	//fd = (FIL *) memman_alloc_4k(memman, sizeof(FIL));
+	set_palette(0,16,table_rgb);
 	
-	char s[60];
+	io_out16(0x03c4,0x0100);
 	
-	sprintf(s, "CS:%08x SS:%08x\n", read_cs(), read_ss());
-	cons_putstr0(cons, s);
+	io_out8(0x03c2,0xe3);
+	io_out8(0x03c3,0x01);
 	
-	char b[512];
+	int i;
+	int x3c4_data[] = { 0x01, 0x0f, 0x00, 0x06 };
+	int x3d4_dataA[] = { 0x5f, 0x4f, 0x50, 0x82, 0x54, 0x80, 0x0b, 0x3e };
+	int x3d4_dataB[] = { 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+	int x3d4_dataC[] = { 0xea, 0x8c, 0xdf, 0x28, 0x00, 0xe7, 0x04, 0xe3, 0xff };
+	int x3ce_data[] = { 0x00, 0x0f, 0x00, 0x00, 0x00, 0x03, 0x05, 0x00, 0xff };
+	int x3c0_dataA[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07 };
+	int x3c0_dataB[] = { 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f };
+	int x3c0_dataC[] = { 0x01, 0x00, 0x0f, 0x00, 0x00 };
+	
+	for(i = 0x01; i <= 0x04; i++) io_out16(0x03c4,i | (x3c4_data[i-1] << 8));
+	
+	io_out16(0x03c4,0x0300);
+	
+	io_out16(0x03d4,0x2011);
+	
+	for(i = 0x00; i <= 0x07; i++) io_out16(0x03d4,i | (x3d4_dataA[i] << 8));
+	for(i = 0x08; i <= 0x0f; i++) io_out16(0x03d4,i | (x3d4_dataB[i-0x08] << 8));
+	for(i = 0x10; i <= 0x18; i++) io_out16(0x03d4,i | (x3d4_dataC[i-0x10] << 8));
+	
+	for(i = 0x00; i <= 0x08; i++) io_out16(0x03ce,i | (x3ce_data[i] << 8));
+	
+	for(i = 0x00; i <= 0x07; i++) {
+		int dmy = io_in8(0x3da);
+		io_out8(0x3c0, i|0x20);
+		io_out8(0x3c0, x3c0_dataA[i]);
+	}
+	
+	for(i = 0x08; i <= 0x0f; i++) {
+		int dmy = io_in8(0x3da);
+		io_out8(0x3c0, i|0x20);
+		io_out8(0x3c0, x3c0_dataB[i-0x08]);
+	}
+	
+	for(i = 0x10; i <= 0x14; i++) {
+		int dmy = io_in8(0x3da);
+		io_out8(0x3c0, i|0x20);
+		io_out8(0x3c0, x3c0_dataC[i-0x10]);
+	}
+	
+	io_out8(0x3c6, 0xff);
+	io_out16(0x3ce, 0x0305);
+	
+	memset(0xa0000,0,640*480/8);
 	
 	find_pci_device();
-	//show_all_pci_device();
 	init_ata_disk_driver();
 	
 	ata = &fs;
 	
-	printk("ATA DONE\n");
+	f_mount(&fs,"",1);
 	
-	int r = f_mount(&fs,"",1);
+	fork("init.eim");
 	
-	printk("mount %d\n", r);
-	
-	struct TASK *forktask = task_alloc();
-	int *fork_fifo = (int *) memman_alloc_4k(memman, 128 * 4);
-	forktask->tss.esp = memman_alloc_4k(memman, 64 * 1024) + 64 * 1024 - 8;
-	forktask->tss.eip = (int) &fork_sub;
-	forktask->tss.es = 1 * 8;
-	forktask->tss.cs = 2 * 8;
-	forktask->tss.ss = 1 * 8;
-	forktask->tss.ds = 1 * 8;
-	forktask->tss.fs = 1 * 8;
-	forktask->tss.gs = 1 * 8;
-	*((char **) (forktask->tss.esp + 4)) = "app.eim";
-	task_run(forktask, 1, 2);
-	fifo32_init(&(forktask->fifo), 128, fork_fifo, forktask);
-	
-	while(1);
+	while(1)
+	{
+		if(fifo32_status(&fifo) != 0) {
+			i = fifo32_get(&fifo);
+			if (1024 <= i && i <= 2023) {
+				kill_fork(taskctl->tasks0 + (i - 1024));
+			}
+		} else {
+			task_sleep(task_a);
+		}
+	}
 }
 
 int *microx_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int eax)
@@ -151,15 +258,10 @@ int *microx_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, i
 	int *reg = &eax + 1;
 	
 	int *p = (int *)(ds_base + eax);
-	int *q = (int *)(ds_base + ecx);
 	
-	//printk("p = %08x\n",eax);
-	//printk("q = %08x\n",ecx);
-	
-	//printk("p[0] = %d\n", p[0]);
-	//printk("p[1] = %d\n", p[1]);
-	
-	if(p[0] == 0) printk("%c",p[1] & 0xff);
+	if(p[0] == mx32api_putchar) {
+		printk("%c",p[1] & 0xff);
+	}
 	
 	return 0;
 }

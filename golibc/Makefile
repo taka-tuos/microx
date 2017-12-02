@@ -3,17 +3,7 @@ OBJS_GOLIBC = vsprintf.o abs.o atoi.o errno.o memchr.o memcmp.o memcpy.o memmove
 			strcspn.o strlen.o strncat.o strncmp.o strncpy.o strpbrk.o strrchr.o \
 			strspn.o strstr.o strtol.o strtoul.o strtoul0.o 
 
-MAKE     = make -r
-GCC      = gcc
-AR       = ar
-DEL      = rm
-COPY     = cp
-GRUB     = grub-mkrescue
-
-CFLAGS = -I. -fno-builtin
-CFLAGS += -fno-common -nostdlib -nostdinc -nostartfiles -nodefaultlibs 
-CFLAGS += -m32 -march=i386 -fno-pie
-CFLAGS += -mno-red-zone -ffreestanding -fno-stack-protector
+include ../cflags.mk
 
 # default
 

@@ -1,16 +1,6 @@
 OBJS_LIB = libmicrox.o
 
-MAKE     = make -r
-GCC      = gcc
-AR       = ar
-DEL      = rm
-COPY     = cp
-GRUB     = grub-mkrescue
-
-CFLAGS = -I. -fno-builtin
-CFLAGS += -fno-common -nostdlib -nostdinc -nostartfiles -nodefaultlibs 
-CFLAGS += -m32 -march=i386 -fno-pie
-CFLAGS += -mno-red-zone -ffreestanding -fno-stack-protector
+include ../cflags.mk
 
 # default
 

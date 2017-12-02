@@ -1,10 +1,22 @@
 #include "console.h"
 #include "asmfuncs.h"
 
+#include "vga_font.h"
+
 void cons_putchar_hw(int x, int y, unsigned char f, unsigned char b, int c)
 {
-	((unsigned char *)VRAM_TEXTMODE)[(x + y * MAX_X) * 2 + 0] = c;
-	((unsigned char *)VRAM_TEXTMODE)[(x + y * MAX_X) * 2 + 1] = 7;
+	//((unsigned char *)VRAM_TEXTMODE)[(x + y * MAX_X) * 2 + 0] = c;
+	//((unsigned char *)VRAM_TEXTMODE)[(x + y * MAX_X) * 2 + 1] = 7;
+	
+	for(int i = 0; i < 16; i++)
+	{
+		unsigned char *p = (unsigned char *)0xa0000+((y*16+i)*(640/8)+x);
+		io_out16(0x3ce, b << 8);
+		*p = 0xff;
+		io_out16(0x3ce, f << 8);
+		int dmy = *p;
+		*p = vga_font[c * 16 + i];
+	}
 }
 
 void cons_applycursor(struct CONSOLE *cons)
@@ -55,18 +67,21 @@ void cons_putchar(struct CONSOLE *cons, int chr, char move)
 void cons_newline(struct CONSOLE *cons)
 {
 	int x, y;
-	if (cons->cur_y < 25 - 1) {
+	if (cons->cur_y < 30 - 1) {
 		cons->cur_y++; /* 次の行へ */
 	} else {
 		/* スクロール */
-		for (y = 0; y < MAX_Y - 1; y++) {
-			for (x = 0; x < MAX_X; x++) {
-				((unsigned short *)VRAM_TEXTMODE)[x + y * MAX_X] = ((unsigned short *)VRAM_TEXTMODE)[x + (y + 1) * MAX_X];
-			}
-		}
+		//for (y = 0; y < MAX_Y - 1; y++) {
+		//	for (x = 0; x < MAX_X; x++) {
+		//		//((unsigned short *)VRAM_TEXTMODE)[x + y * MAX_X] = ((unsigned short *)VRAM_TEXTMODE)[x + (y + 1) * MAX_X];
+		//		memcpy(0xa0000+((y*16)*(640/8)+x), 0xa0000+(((y+1)*16)*(640/8)+x), 80*16);
+		//	}
+		//}
+		memcpy(0xa0000, 0xa0000+80*16, 80*29*16);
 		for (y = MAX_Y - 1; y < MAX_Y; y++) {
 			for (x = 0; x < MAX_X; x++) {
-				((unsigned short *)VRAM_TEXTMODE)[x + y * MAX_X] = COL8_000000;
+				//((unsigned short *)VRAM_TEXTMODE)[x + y * MAX_X] = COL8_000000;
+				memset(0xa0000+((y*16)*(640/8)+x), 0, 80*16);
 			}
 		}
 	}
