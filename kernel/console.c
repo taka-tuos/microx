@@ -91,17 +91,19 @@ void cons_newline(struct CONSOLE *cons)
 
 void cons_putstr0(struct CONSOLE *cons, char *s)
 {
-	for (; *s != 0; s++) {
-		cons_putchar(cons, *s, 1);
+	unsigned char *sz = (unsigned char *)s;
+	for (; *sz != 0; sz++) {
+		cons_putchar(cons, *sz, 1);
 	}
 	return;
 }
 
 void cons_putstr1(struct CONSOLE *cons, char *s, int l)
 {
+	unsigned char *sz = (unsigned char *)s;
 	int i;
 	for (i = 0; i < l; i++) {
-		cons_putchar(cons, s[i], 1);
+		cons_putchar(cons, sz[i], 1);
 	}
 	return;
 }

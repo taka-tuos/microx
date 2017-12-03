@@ -5,20 +5,20 @@
 
 void HariMain(void)
 {
-	DIR Dir;
-	FILINFO Finfo;
+	//DIR Dir;
+	//FILINFO Finfo;
 	
 	int res,p1,s1,s2;
-	res = f_opendir(&Dir,"/");
+	//res = f_opendir(&Dir,"/");
 	
 	xdev_out(putc);
 	
-	if (res) {
+	/*if (res) {
 		puts("opendir failed");
 		exit();
-	}
-	p1 = s1 = s2 = 0;
-	for(;;) {
+	}*/
+	//p1 = s1 = s2 = 0;
+	/*for(;;) {
 		res = f_readdir(&Dir, &Finfo);
 		if ((res != FR_OK) || !Finfo.fname[0]) break;
 		if (Finfo.fattrib & AM_DIR) {
@@ -36,7 +36,18 @@ void HariMain(void)
 				(Finfo.ftime >> 11), (Finfo.ftime >> 5) & 63,
 				Finfo.fsize, &(Finfo.fname[0]));
 	}
-	xprintf("%4u File(s),%10lu bytes\n%4u Dir(s)", s1, p1, s2);
+	xprintf("%4u File(s),%10lu bytes\n%4u Dir(s)\n", s1, p1, s2);*/
+	
+	//f_closedir(&Dir);
+	
+	int fd;
+	char s[256];
+	fd = open("README.MD",FA_READ);
+	
+	while(read(fd,s,1)) putc(s[0]);
+	close(fd);
+	
+	xprintf("END\n");
 	
 	exit();
 }

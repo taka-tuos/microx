@@ -50,7 +50,16 @@ static uint32_t inl(uint16_t port)
 
 static void *kmalloc(int size)
 {
-	return memman_alloc_4k(MEMMAN_ADDR,size);
+	char *p = (char *)memman_alloc_4k(MEMMAN_ADDR,size+4);
+	*((int *)p) = size+4;
+	return p + 4;
+}
+
+static void kfree(void *ptr)
+{
+	char *p = (char *)ptr;
+	p = p - 4;
+	memman_free_4k(MEMMAN_ADDR,p,*((int *)p));
 }
 
 static int printk(char *format, ...)

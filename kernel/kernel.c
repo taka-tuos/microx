@@ -19,6 +19,8 @@ struct FIFO32 ***fifo_list;
 
 #define KEYCMD_LED		0xed
 
+int api_errno = 0;
+
 void fork_exit(void)
 {
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
@@ -57,6 +59,15 @@ void fork_task(char *path)
 			dathrb = *((int *) (p + 0x0014));
 			q = (char *) memman_alloc_4k(memman, segsiz);
 			task->ds_base = (int) q;
+			task->cs_base = (int) p;
+			
+			int malloc_ctl = *((int *)&p[0x20]);
+			int malloc_adr = *((int *)&p[0x20])+32*1024;
+			int malloc_siz = *((int *)&p[0x00])-malloc_adr;
+			
+			memman_init((struct MEMMAN *) &q[malloc_ctl]);
+			malloc_siz &= 0xfffffff0;
+			memman_free((struct MEMMAN *) &q[malloc_ctl], malloc_adr, malloc_siz);
 			
 			//DUMP(segsiz);
 			//DUMP(esp);
@@ -81,6 +92,8 @@ void fork_task(char *path)
 	
 	for(int t = 0; t < FIFOTYPE_NUM; t++)
 		for(int l = 0; l < 1024; l++) if(fifo_list[t][l] == &task->fifo) fifo_list[t][l] = 0;
+	
+	//printk("killed\n");
 	
 	fork_exit();
 }
@@ -440,6 +453,36 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 	}
 }
 
+void *app_malloc(int siz)
+{
+	struct TASK *task = task_now();
+	char *p = (char *)task->cs_base;
+	int malloc_ctl = *((int *)&p[0x20]);
+	int malloc_adr = *((int *)&p[0x20])+32*1024;
+	int malloc_siz = *((int *)&p[0x00])-malloc_adr;
+	struct MEMMAN *memman = (struct MEMMAN *)(malloc_ctl + task->ds_base);
+	
+	char *q = (char *)memman_alloc(memman, siz+4);
+	
+	*((int *)q) = siz+4;
+	
+	return q + 4;
+}
+
+void *app_free(void *ptr)
+{
+	struct TASK *task = task_now();
+	char *p = (char *)task->cs_base;
+	int malloc_ctl = *((int *)&p[0x20]);
+	int malloc_adr = *((int *)&p[0x20])+32*1024;
+	int malloc_siz = *((int *)&p[0x00])-malloc_adr;
+	struct MEMMAN *memman = (struct MEMMAN *)(malloc_ctl + task->ds_base);
+	
+	char *q = ((char *)ptr) - 4;
+	
+	memman_free(memman, q, *((int *)q));
+}
+
 int *microx_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, int eax)
 {
 	struct TASK *task = task_now();
@@ -456,6 +499,7 @@ int *microx_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, i
 	if(id == mx32api_putchar) {
 		printk("%c",p[1] & 0xff);
 	} else if(id == mx32api_exit) {
+		//printk("EXIT");
 		return &(task->tss.esp0);
 	} else if(id == mx32api_fifo32_status) {
 		p[1] = fifo32_status(fifo);
@@ -481,96 +525,45 @@ int *microx_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, i
 				break;
 			}
 		}
-	} else if(id >= mx32api_open && id <= mx32api_fgets) {
-		switch(id) {
-		case mx32api_open:
-			p[15] = f_open(p[1]+ds_base,p[2]+ds_base,p[3]);
-			break;
-
-		case mx32api_close:
-			p[15] = f_close(p[1]+ds_base);
-			break;
-
-		case mx32api_read:
-			p[15] = f_read(p[1]+ds_base,p[2]+ds_base,p[3],p[4]+ds_base);
-			break;
-
-		case mx32api_write:
-			p[15] = f_write(p[1]+ds_base,p[2]+ds_base,p[3],p[4]+ds_base);
-			break;
-
-		case mx32api_lseek:
-			p[15] = f_lseek(p[1]+ds_base,p[2]);
-			break;
-
-		case mx32api_truncate:
-			p[15] = f_truncate(p[1]+ds_base);
-			break;
-
-		case mx32api_sync:
-			p[15] = f_sync(p[1]+ds_base);
-			break;
-
-		case mx32api_opendir:
-			//printk("opendir\n");
-			//DUMP(p[1]+ds_base)
-			//DUMP(p[2]+ds_base)
-			p[15] = f_opendir(p[1]+ds_base,p[2]+ds_base);
-			//DUMP(p[15])
-			break;
-
-		case mx32api_closedir:
-			p[15] = f_closedir(p[1]+ds_base);
-			break;
-
-		case mx32api_readdir:
-			//printk("readdir\n");
-			//DUMP(p[1]+ds_base)
-			//DUMP(p[2]+ds_base)
-			p[15] = f_readdir(p[1]+ds_base,p[2]+ds_base);
-			//DUMP(p[15])
-			break;
-
-		case mx32api_mkdir:
-			p[15] = f_mkdir(p[1]+ds_base);
-			break;
-
-		case mx32api_unlink:
-			p[15] = f_unlink(p[1]+ds_base);
-			break;
-
-		case mx32api_rename:
-			p[15] = f_rename(p[1]+ds_base,p[2]+ds_base);
-			break;
-
-		case mx32api_stat:
-			p[15] = f_stat(p[1]+ds_base,p[2]+ds_base);
-			break;
-
-		case mx32api_chdir:
-			p[15] = f_chdir(p[1]+ds_base);
-			break;
-
-		case mx32api_chdrive:
-			p[15] = f_chdrive(p[1]+ds_base);
-			break;
-
-		case mx32api_getcwd:
-			p[15] = f_getcwd(p[1]+ds_base,p[2]);
-			break;
-
-		case mx32api_fputc:
-			p[15] = f_putc(p[1],p[2]+ds_base);
-			break;
-
-		case mx32api_fputs:
-			p[15] = f_puts(p[1]+ds_base,p[2]+ds_base);
-			break;
-
-		case mx32api_fgets:
-			p[15] = f_gets(p[1]+ds_base,p[2],p[3]+ds_base)-ds_base;
-			break;
-		}
+	} else if(id == mx32api_open) {
+		FIL *fp = app_malloc(sizeof(FIL));
+		int r = f_open(fp,p[1]+ds_base,p[2]);
+		p[15] = r != FR_OK ? -1 : fp;
+		if(r != FR_OK) app_free(fp);
+		api_errno = r;
+	} else if(id == mx32api_close) {
+		FIL *fp = (FIL *)p[1];
+		int r = f_close(fp);
+		api_errno = r;
+		p[15] = r;
+		app_free(fp);
+	} else if(id == mx32api_read) {
+		FIL *fp = (FIL *)p[1];
+		UINT br;
+		int r = f_read(fp,p[2]+ds_base,p[3],&br);
+		api_errno = r;
+		p[15] = br;
+	} else if(id == mx32api_write) {
+		FIL *fp = (FIL *)p[1];
+		UINT bw;
+		int r = f_write(fp,p[2]+ds_base,p[3],&bw);
+		api_errno = r;
+		p[15] = bw;
+	} else if(id == mx32api_lseek) {
+		FIL *fp = (FIL *)p[1];
+		int ofs;
+		ofs = p[2];
+		if(p[3] == 0x01) ofs = (int)f_tell(fp) + ofs;
+		if(p[3] == 0x02) ofs = (int)f_size(fp) - ofs;
+		int r = f_lseek(fp, ofs);
+		api_errno = r;
+		p[15] = r;
+	} else if(id == mx32api_tell) {
+		FIL *fp = (FIL *)p[1];
+		api_errno = 0;
+		p[15] = f_tell(fp);
+	} else if(id == mx32api_errno) {
+		p[15] = api_errno;
 	}
 	
 	return 0;

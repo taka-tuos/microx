@@ -124,7 +124,7 @@ struct TASK {
 	struct TSS32 tss;
 	int fpu[108 / 4];
 	struct SEGMENT_DESCRIPTOR ldt[2];
-	int ds_base, cons_stack;
+	int ds_base, cs_base, cons_stack;
 	struct FILEHANDLE *fhandle;
 	unsigned char langmode, langbyte1;
 };
