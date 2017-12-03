@@ -3,41 +3,40 @@
 
 #include "vga_font.h"
 
-void cons_putchar_hw(int x, int y, unsigned char f, unsigned char b, int c)
+void cons_putchar_hw(int x, int y, int c)
 {
-	//((unsigned char *)VRAM_TEXTMODE)[(x + y * MAX_X) * 2 + 0] = c;
-	//((unsigned char *)VRAM_TEXTMODE)[(x + y * MAX_X) * 2 + 1] = 7;
-	
 	for(int i = 0; i < 16; i++)
 	{
 		unsigned char *p = (unsigned char *)0xa0000+((y*16+i)*(640/8)+x);
-		io_out16(0x3ce, b << 8);
+		io_out16(0x3ce, 0x0000);
 		*p = 0xff;
-		io_out16(0x3ce, f << 8);
+		io_out16(0x3ce, 0x0700);
 		int dmy = *p;
 		*p = vga_font[c * 16 + i];
 	}
 }
 
-void cons_applycursor(struct CONSOLE *cons)
+void cons_applycursor(struct CONSOLE *cons, int del)
 {
 	int x = cons->cur_x;
 	int y = cons->cur_y;
 	
-	int postion = x + y * MAX_X;
 	
-	io_out8(0x3d4, 0xf);
-	io_out8(0x3d5, postion & 0xff);
-	
-	io_out8(0x3d4, 0xe);
-	io_out8(0x3d5, postion >> 8);
+	if(del) {
+		io_out16(0x3ce, 0 << 8);
+		for(int i = 14; i < 16; i++) *((unsigned char *)0xa0000+((y*16+i)*(640/8)+x)) = 0xff;
+	} else {
+		io_out16(0x3ce, 15 << 8);
+		for(int i = 14; i < 16; i++) *((unsigned char *)0xa0000+((y*16+i)*(640/8)+x)) = 0x7e;
+	}
 }
 
 void cons_putchar(struct CONSOLE *cons, int chr, char move)
 {
+	cons_applycursor(cons,1);
 	if (chr == 0x09) {	/* タブ */
 		for (;;) {
-			cons_putchar_hw(cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, ' ');
+			cons_putchar_hw(cons->cur_x, cons->cur_y, ' ');
 			cons->cur_x++;
 			if (cons->cur_x == 80) {
 				cons_newline(cons);
@@ -51,7 +50,7 @@ void cons_putchar(struct CONSOLE *cons, int chr, char move)
 	} else if (chr == 0x0d) {	/* 復帰 */
 		/* とりあえずなにもしない */
 	} else {	/* 普通の文字 */
-		cons_putchar_hw(cons->cur_x, cons->cur_y, COL8_FFFFFF, COL8_000000, chr);
+		cons_putchar_hw(cons->cur_x, cons->cur_y, chr);
 		if (move != 0) {
 			/* moveが0のときはカーソルを進めない */
 			cons->cur_x++;
@@ -60,7 +59,7 @@ void cons_putchar(struct CONSOLE *cons, int chr, char move)
 			}
 		}
 	}
-	cons_applycursor(cons);
+	cons_applycursor(cons,0);
 	return;
 }
 
@@ -71,17 +70,11 @@ void cons_newline(struct CONSOLE *cons)
 		cons->cur_y++; /* 次の行へ */
 	} else {
 		/* スクロール */
-		//for (y = 0; y < MAX_Y - 1; y++) {
-		//	for (x = 0; x < MAX_X; x++) {
-		//		//((unsigned short *)VRAM_TEXTMODE)[x + y * MAX_X] = ((unsigned short *)VRAM_TEXTMODE)[x + (y + 1) * MAX_X];
-		//		memcpy(0xa0000+((y*16)*(640/8)+x), 0xa0000+(((y+1)*16)*(640/8)+x), 80*16);
-		//	}
-		//}
-		memcpy(0xa0000, 0xa0000+80*16, 80*29*16);
+		io_out16(0x3ce, 0x0700);
+		memcpy(0xa0000, 0xa0000+(640/8)*16, (640/8)*16*29);
 		for (y = MAX_Y - 1; y < MAX_Y; y++) {
 			for (x = 0; x < MAX_X; x++) {
-				//((unsigned short *)VRAM_TEXTMODE)[x + y * MAX_X] = COL8_000000;
-				memset(0xa0000+((y*16)*(640/8)+x), 0, 80*16);
+				memset(0xa0000+(640/8)*16*y, 0, (640/8)*16);
 			}
 		}
 	}

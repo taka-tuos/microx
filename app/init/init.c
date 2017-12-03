@@ -3,15 +3,30 @@
 
 #include "xprintf.h"
 
+//unsigned char fb[640*480/2];
+
 void HariMain(void)
 {
 	//DIR Dir;
 	//FILINFO Finfo;
 	
-	int res,p1,s1,s2;
+	//int res,p1,s1,s2;
 	//res = f_opendir(&Dir,"/");
 	
 	xdev_out(putc);
+	
+	//fbblt(fb);
+	
+	/*int i = 0;
+	while(1) {
+		fbwcol(i&0xf);
+		for(int y = 0; y < 480; y++) {
+			for(int x = 0; x < 640/8; x++) {
+				fbwrite(y*(640/8)+x,0xff);
+			}
+		}
+		i++;
+	}*/
 	
 	/*if (res) {
 		puts("opendir failed");
@@ -48,6 +63,8 @@ void HariMain(void)
 	close(fd);
 	
 	xprintf("END\n");
+	
+	for(int i = 0;; i++) xprintf("scroll!! %d\n",i);
 	
 	exit();
 }

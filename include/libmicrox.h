@@ -79,7 +79,7 @@ enum {
 	mx32api_write,
 	mx32api_lseek,
 	mx32api_tell,
-	mx32api_errno
+	mx32api_errno,
 };
 
 enum {

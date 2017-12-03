@@ -37,7 +37,7 @@ void fork_exit(void)
 void fork_task(char *path)
 {
 	int i, segsiz, datsiz, esp, dathrb, appsiz;
-	char *p, *q;
+	char *p, *q, *f;
 	struct TASK *task = task_now();
 	UINT dmy;
 	FIL *fd;
@@ -46,6 +46,8 @@ void fork_task(char *path)
 	fd = (FIL *) memman_alloc_4k(memman, sizeof(FIL));
 	
 	int r = f_open(fd,path,FA_READ);
+	
+	f = (char *)0xa0000;
 	
 	if(r == FR_OK) {
 		appsiz = f_size(fd);
@@ -76,6 +78,7 @@ void fork_task(char *path)
 			
 			set_segmdesc(task->ldt + 0, appsiz + 1024 - 1, (int) p, AR_CODE32_ER + 0x60);
 			set_segmdesc(task->ldt + 1, segsiz + 1024 - 1, (int) q, AR_DATA32_RW + 0x60);
+			//set_segmdesc(task->ldt + 2, 0xffff + 1024 - 1, (int) f, AR_DATA32_RW + 0x60);
 			for (i = 0; i < datsiz; i++) {
 				q[esp + i] = p[dathrb + i];
 			}
@@ -565,6 +568,7 @@ int *microx_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, i
 	} else if(id == mx32api_errno) {
 		p[15] = api_errno;
 	}
+	
 	
 	return 0;
 }
