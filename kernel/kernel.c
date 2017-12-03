@@ -6,8 +6,10 @@
 #include "bootpack.h"
 #include "ff.h"
 
+#include "vga_font.h"
+
 #define __KERNEL__
-#include <libmicrox.h>
+#include <sys/api.h>
 
 #define DUMP(v) printk(#v " = %08x\n", v);
 
@@ -20,6 +22,54 @@ struct FIFO32 ***fifo_list;
 #define KEYCMD_LED		0xed
 
 int api_errno = 0;
+
+#define PS2_TAB                      9
+#define PS2_ENTER                    13
+#define PS2_BACKSPACE                127
+#define PS2_ESC                      27
+#define PS2_INSERT                   '^'
+#define PS2_DELETE                   '~' 
+#define PS2_HOME                     'H'
+#define PS2_END                      'F'
+#define PS2_PAGEUP                   '^'
+#define PS2_PAGEDOWN                 '^'
+#define PS2_UPARROW                  'A'
+#define PS2_LEFTARROW                'D'
+#define PS2_DOWNARROW                'B'
+#define PS2_RIGHTARROW               'C'
+
+#define BREAK     0x0001
+#define MODIFIER  0x0002
+#define SHIFT_L   0x0004
+#define SHIFT_R   0x0008
+#define CAPS      0x0010
+#define ALT       0x0020
+#define CTRL      0x0040
+#define SCROLL    0x0080
+#define NUM	      0x0100
+
+const int keytable[2][128] = {
+	{
+		'\0', '\e', '1' , '2' , '3' , '4' , '5' , '6' , '7' , '8' , '9' , '0' , '-' , '^' , '\b', '\t',
+		'q' , 'w' , 'e' , 'r' , 't' , 'y' , 'u' , 'i' , 'o' , 'p' , '@' , '[' , '\n', '\0', 'a' , 's' ,
+		'd' , 'f' , 'g' , 'h' , 'j' , 'k' , 'l' , ';' , ':' , '`' , '\0', ']' , 'z' , 'x' , 'c' , 'v' ,
+		'b' , 'n' , 'm' , ',' , '.' , '/' , '\0', '*' , '\0', ' ' , '\0', '\0', '\0', '\0', '\0', '\0',
+		'\0', '\0', '\0', '\0', '\0', '\0', '\0', '7' , '8' , '9' , '-' , '4' , '5' , '6' , '+' , '1' ,
+		'2' , '3' , '0' , '.' , '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+		'\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+		'\0', '\0', '\0', '_' , '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\\', '\0', '\0',
+	},
+	{
+		'\0', '\e', '!' , '\"', '#' , '$' , '%' , '&' , '\'', '(' , ')' , '\0', '=' , '~' , '\b', '\t',
+		'Q' , 'W' , 'E' , 'R' , 'T' , 'Y' , 'U' , 'I' , 'O' , 'P' , '`' , '{' , '\n', '\0', 'A' , 'S' ,
+		'D' , 'F' , 'G' , 'H' , 'J' , 'K' , 'L' , '+' , '*' , '`' , '\0', '}' , 'Z' , 'X' , 'C' , 'V' ,
+		'B' , 'N' , 'M' , '<' , '>' , '?' , '\0', '*' , '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+		'\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '-' , '\0', '\0', '\0', '+' , '\0',
+		'\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+		'\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+		'\0', '\0', '\0', '_' , '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\\', '\0', '\0',
+	}
+};
 
 void fork_exit(void)
 {
@@ -37,7 +87,7 @@ void fork_exit(void)
 void fork_task(char *path)
 {
 	int i, segsiz, datsiz, esp, dathrb, appsiz;
-	char *p, *q, *f;
+	char *p, *q;
 	struct TASK *task = task_now();
 	UINT dmy;
 	FIL *fd;
@@ -47,14 +97,12 @@ void fork_task(char *path)
 	
 	int r = f_open(fd,path,FA_READ);
 	
-	f = (char *)0xa0000;
-	
 	if(r == FR_OK) {
 		appsiz = f_size(fd);
 		p = (char *) memman_alloc_4k(memman, appsiz);
 		f_read(fd, p, appsiz, &dmy);
 		
-		if (appsiz >= 36 && strncmp(p + 4, "Hari", 4) == 0 && *p == 0x00) {
+		if (appsiz >= 36 && strncmp(p + 4, "MicX", 4) == 0 && *p == 0x00) {
 			segsiz = *((int *) (p + 0x0000));
 			esp    = *((int *) (p + 0x000c));
 			datsiz = *((int *) (p + 0x0010));
@@ -78,7 +126,6 @@ void fork_task(char *path)
 			
 			set_segmdesc(task->ldt + 0, appsiz + 1024 - 1, (int) p, AR_CODE32_ER + 0x60);
 			set_segmdesc(task->ldt + 1, segsiz + 1024 - 1, (int) q, AR_DATA32_RW + 0x60);
-			//set_segmdesc(task->ldt + 2, 0xffff + 1024 - 1, (int) f, AR_DATA32_RW + 0x60);
 			for (i = 0; i < datsiz; i++) {
 				q[esp + i] = p[dathrb + i];
 			}
@@ -170,60 +217,13 @@ void set_palette(int start, int end, unsigned char *rgb)
 	return;
 }
 
-#define PS2_TAB                      9
-#define PS2_ENTER                    13
-#define PS2_BACKSPACE                127
-#define PS2_ESC                      27
-#define PS2_INSERT                   '^'
-#define PS2_DELETE                   '~' 
-#define PS2_HOME                     'H'
-#define PS2_END                      'F'
-#define PS2_PAGEUP                   '^'
-#define PS2_PAGEDOWN                 '^'
-#define PS2_UPARROW                  'A'
-#define PS2_LEFTARROW                'D'
-#define PS2_DOWNARROW                'B'
-#define PS2_RIGHTARROW               'C'
-
-#define BREAK     0x0001
-#define MODIFIER  0x0002
-#define SHIFT_L   0x0004
-#define SHIFT_R   0x0008
-#define CAPS      0x0010
-#define ALT       0x0020
-#define CTRL      0x0040
-#define SCROLL    0x0080
-#define NUM	      0x0100
-
-const int keytable[2][128] = {
-	{
-		'\0', '\e', '1' , '2' , '3' , '4' , '5' , '6' , '7' , '8' , '9' , '0' , '-' , '^' , '\b', '\t',
-		'q' , 'w' , 'e' , 'r' , 't' , 'y' , 'u' , 'i' , 'o' , 'p' , '@' , '[' , '\n', '\0', 'a' , 's' ,
-		'd' , 'f' , 'g' , 'h' , 'j' , 'k' , 'l' , ';' , ':' , '`' , '\0', ']' , 'z' , 'x' , 'c' , 'v' ,
-		'b' , 'n' , 'm' , ',' , '.' , '/' , '\0', '*' , '\0', ' ' , '\0', '\0', '\0', '\0', '\0', '\0',
-		'\0', '\0', '\0', '\0', '\0', '\0', '\0', '7' , '8' , '9' , '-' , '4' , '5' , '6' , '+' , '1' ,
-		'2' , '3' , '0' , '.' , '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-		'\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-		'\0', '\0', '\0', '_' , '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\\', '\0', '\0',
-	},
-	{
-		'\0', '\e', '!' , '\"', '#' , '$' , '%' , '&' , '\'', '(' , ')' , '\0', '=' , '~' , '\b', '\t',
-		'Q' , 'W' , 'E' , 'R' , 'T' , 'Y' , 'U' , 'I' , 'O' , 'P' , '`' , '{' , '\n', '\0', 'A' , 'S' ,
-		'D' , 'F' , 'G' , 'H' , 'J' , 'K' , 'L' , '+' , '*' , '`' , '\0', '}' , 'Z' , 'X' , 'C' , 'V' ,
-		'B' , 'N' , 'M' , '<' , '>' , '?' , '\0', '*' , '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-		'\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '-' , '\0', '\0', '\0', '+' , '\0',
-		'\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-		'\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-		'\0', '\0', '\0', '_' , '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\\', '\0', '\0',
-	}
-};
-
 void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 {
 	struct FIFO32 fifo, keycmd;
 	int fifobuf[128], keycmd_buf[32];
 	struct TASK *task_a, *task;
 	int key_shift = 0, key_leds = 0, keycmd_wait = -1;
+	int i, j;
 	
 	struct FIFO32 *fifolist_buf[FIFOTYPE_NUM][1024];
 	
@@ -253,57 +253,25 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 	
 	cons = (struct CONSOLE *) memman_alloc_4k(memman, sizeof(struct CONSOLE));
 	
+	cons_initalize(cons);
+	
 	set_palette(0,16,table_rgb);
 	
-	io_out16(0x03c4,0x0100);
+	io_out16(0x03ce,0x0005);
+	io_out16(0x03ce,0x0406);
+	io_out16(0x03c4,0x0402);
+	io_out16(0x03c4,0x0604);
 	
-	io_out8(0x03c2,0xe3);
-	io_out8(0x03c3,0x01);
-	
-	int i;
-	int x3c4_data[] = { 0x01, 0x0f, 0x00, 0x06 };
-	int x3d4_dataA[] = { 0x5f, 0x4f, 0x50, 0x82, 0x54, 0x80, 0x0b, 0x3e };
-	int x3d4_dataB[] = { 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-	int x3d4_dataC[] = { 0xea, 0x8c, 0xdf, 0x28, 0x00, 0xe7, 0x04, 0xe3, 0xff };
-	int x3ce_data[] = { 0x00, 0x0f, 0x00, 0x00, 0x00, 0x03, 0x05, 0x00, 0xff };
-	int x3c0_dataA[] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07 };
-	int x3c0_dataB[] = { 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f };
-	int x3c0_dataC[] = { 0x01, 0x00, 0x0f, 0x00, 0x00 };
-	
-	for(i = 0x01; i <= 0x04; i++) io_out16(0x03c4,i | (x3c4_data[i-1] << 8));
-	
-	io_out16(0x03c4,0x0300);
-	
-	io_out16(0x03d4,0x2011);
-	
-	for(i = 0x00; i <= 0x07; i++) io_out16(0x03d4,i | (x3d4_dataA[i] << 8));
-	for(i = 0x08; i <= 0x0f; i++) io_out16(0x03d4,i | (x3d4_dataB[i-0x08] << 8));
-	for(i = 0x10; i <= 0x18; i++) io_out16(0x03d4,i | (x3d4_dataC[i-0x10] << 8));
-	
-	for(i = 0x00; i <= 0x08; i++) io_out16(0x03ce,i | (x3ce_data[i] << 8));
-	
-	for(i = 0x00; i <= 0x07; i++) {
-		int dmy = io_in8(0x3da);
-		io_out8(0x3c0, i|0x20);
-		io_out8(0x3c0, x3c0_dataA[i]);
+	for(i = 0; i < 256; i++) {
+		for(j = 0; j < 16; j++) {
+			*((unsigned char *)((i * 32 + j) + 0xa0000)) = vga_font[i * 16 + j];
+		}
 	}
 	
-	for(i = 0x08; i <= 0x0f; i++) {
-		int dmy = io_in8(0x3da);
-		io_out8(0x3c0, i|0x20);
-		io_out8(0x3c0, x3c0_dataB[i-0x08]);
-	}
-	
-	for(i = 0x10; i <= 0x14; i++) {
-		int dmy = io_in8(0x3da);
-		io_out8(0x3c0, i|0x20);
-		io_out8(0x3c0, x3c0_dataC[i-0x10]);
-	}
-	
-	io_out8(0x3c6, 0xff);
-	io_out16(0x3ce, 0x0305);
-	
-	memset(0xa0000,0,640*480/8);
+	io_out16(0x03c4,0x0302);
+	io_out16(0x03c4,0x0204);
+	io_out16(0x03ce,0x1005);
+	io_out16(0x03ce,0x0e06);
 	
 	for(int t = 0; t < FIFOTYPE_NUM; t++)
 		for(int l = 0; l < 1024; l++) fifo_list[t][l] = 0;
@@ -567,8 +535,11 @@ int *microx_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, i
 		p[15] = f_tell(fp);
 	} else if(id == mx32api_errno) {
 		p[15] = api_errno;
+	} else if(id == mx32api_malloc) {
+		p[15] = app_malloc(p[1]);
+	} else if(id == mx32api_free) {
+		p[15] = app_free(p[1]);
 	}
-	
 	
 	return 0;
 }

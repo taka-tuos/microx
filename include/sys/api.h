@@ -46,22 +46,24 @@ typedef enum {
 #define SK_CUR	0x01
 #define SK_SET	0x02
 
-int open(const char *path, int mode);
-int close(int fd);
-int lseek(int fd, int off, int from);
-int read(int fd, void *buf, int cnt);
-int write(int fd, void *buf, int cnt);
-int tell(int fd);
+int x32_Open(const char *path, int mode);
+int x32_Close(int fd);
+int x32_Lseek(int fd, int off, int from);
+int x32_Read(int fd, void *buf, int cnt);
+int x32_Write(int fd, void *buf, int cnt);
+int x32_Tell(int fd);
 
-void putc(int c);
-void keyboard_enable();
-int fifo32_status();
-int fifo32_get();
-int getc();
-void exit();
-void puts(char *s);
+void x32_PutChar(int c);
+void x32_KeyboardEnable();
+int x32_Fifo32Status();
+int x32_Fifo32Get();
+int x32_GetChar();
+void x32_Exit();
+void x32_PutString(char *s);
 
-void mx32api_call(int *p);
+int x32_Errno();
+
+void x32_ApiCall(int *p);
 
 #endif
 
@@ -80,6 +82,8 @@ enum {
 	mx32api_lseek,
 	mx32api_tell,
 	mx32api_errno,
+	mx32api_malloc,
+	mx32api_free,
 };
 
 enum {

@@ -1,11 +1,11 @@
-#include <libmicrox.h>
+#include <sys/api.h>
 #include <stdio.h>
 
 #include "xprintf.h"
 
 //unsigned char fb[640*480/2];
 
-void HariMain(void)
+void MicroMain(void)
 {
 	//DIR Dir;
 	//FILINFO Finfo;
@@ -13,7 +13,7 @@ void HariMain(void)
 	//int res,p1,s1,s2;
 	//res = f_opendir(&Dir,"/");
 	
-	xdev_out(putc);
+	xdev_out(x32_PutChar);
 	
 	//fbblt(fb);
 	
@@ -57,14 +57,14 @@ void HariMain(void)
 	
 	int fd;
 	char s[256];
-	fd = open("README.MD",FA_READ);
+	fd = x32_Open("README.MD",FA_READ);
 	
-	while(read(fd,s,1)) putc(s[0]);
-	close(fd);
+	while(x32_Read(fd,s,1)) x32_PutChar(s[0]);
+	x32_Close(fd);
 	
 	xprintf("END\n");
 	
 	for(int i = 0;; i++) xprintf("scroll!! %d\n",i);
 	
-	exit();
+	x32_Exit();
 }
