@@ -1,21 +1,21 @@
-//*****************************************************************************
-// strcmp.c : string function
-// 2002/02/04 by Gaku : this is rough sketch
-//*****************************************************************************
+/*
+ * strcmp.c
+ */
 
-#include <stddef.h>
+#include <string.h>
 
-//=============================================================================
-// compare D and S
-//=============================================================================
-int strcmp (const char *d, const char *s)
+int strcmp(const char *s1, const char *s2)
 {
-	while ('\0' != *d) {
-		if (*d != *s)
-			return *d - *s;
-		d++;
-		s++;
+	const unsigned char *c1 = (const unsigned char *)s1;
+	const unsigned char *c2 = (const unsigned char *)s2;
+	unsigned char ch;
+	int d = 0;
+
+	while (1) {
+		d = (int)(ch = *c1++) - (int)*c2++;
+		if (d || !ch)
+			break;
 	}
 
-	return *d - *s;
+	return d;
 }

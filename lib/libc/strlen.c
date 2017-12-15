@@ -1,19 +1,13 @@
-//*****************************************************************************
-// strlen.c : string function
-// 2002/02/04 by Gaku : this is rough sketch
-//*****************************************************************************
+/*
+ * strlen()
+ */
 
-#include <stddef.h>
+#include <string.h>
 
-//=============================================================================
-// return the length of D
-//=============================================================================
-size_t strlen (char *d)
+size_t strlen(const char *s)
 {
-	char *tmp = d;
-
-	while ('\0' != *d)
-		d++;
-
-	return d - tmp;
+	const char *ss = s;
+	while (*ss)
+		ss++;
+	return ss - s;
 }

@@ -1,25 +1,51 @@
-//*****************************************************************************
-// strcspn.c : string function
-// 2002/02/04 by Gaku : this is rough sketch
-//*****************************************************************************
+/*
+FUNCTION
+	<<strcspn>>---count characters not in string
 
-#include <stddef.h>
+INDEX
+	strcspn
 
-//=============================================================================
-// return length of D which any characters in S
-//=============================================================================
-size_t strcspn (char *d, const char *s)
+ANSI_SYNOPSIS
+	size_t strcspn(const char *<[s1]>, const char *<[s2]>);
+
+TRAD_SYNOPSIS
+	size_t strcspn(<[s1]>, <[s2]>)
+	char *<[s1]>;
+	char *<[s2]>;
+
+DESCRIPTION
+	This function computes the length of the initial part of
+	the string pointed to by <[s1]> which consists entirely of
+	characters <[NOT]> from the string pointed to by <[s2]>
+	(excluding the terminating null character).
+
+RETURNS
+	<<strcspn>> returns the length of the substring found.
+
+PORTABILITY
+<<strcspn>> is ANSI C.
+
+<<strcspn>> requires no supporting OS subroutines.
+ */
+
+#include <string.h>
+
+size_t strcspn(const char *s1, const char *s2)
 {
-	char *tmp = d;
-	const char *bgn = s;
+  const char *s = s1;
+  const char *c;
 
-	while ('\0' != *d) {
-		while ('\0' != *s)
-			if (*d == *s++)
-				return d - tmp;
-		d++;
-		s = bgn;
+  while (*s1)
+    {
+      for (c = s2; *c; c++)
+	{
+	  if (*s1 == *c)
+	    break;
 	}
+      if (*c)
+	break;
+      s1++;
+    }
 
-	return d - tmp;
+  return s1 - s;
 }

@@ -1,24 +1,11 @@
-//*****************************************************************************
-// strcat.c : string function
-// 2002/02/04 by Gaku : this is rough sketch
-//*****************************************************************************
+/*
+ * strcat.c
+ */
 
-#include <stddef.h>
+#include <string.h>
 
-//=============================================================================
-// append S to D
-//=============================================================================
-char* strcat (char *d, const char *s)
+char *strcat(char *dst, const char *src)
 {
-	char *tmp = d;
-
-	while ('\0' != *d)
-		d++;
-
-	while ('\0' != *s)
-		*d++ = *s++;
-
-	*d = '\0';
-
-	return tmp;
+	strcpy(strchr(dst, '\0'), src);
+	return dst;
 }

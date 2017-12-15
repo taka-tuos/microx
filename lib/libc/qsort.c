@@ -1,36 +1,46 @@
-/* K&R‚©‚ç‚Ù‚Ú‚»‚Ì‚Ü‚Üˆø—p */
+/*
+ * qsort.c
+ *
+ * This is actually combsort.  It's an O(n log n) algorithm with
+ * simplicity/small code size being its main virtue.
+ */
 
 #include <stddef.h>
-#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-#define pV(i) (((char *) base) + (i) * size)
-
-static void swap(size_t size, char *p, char *q)
+static inline size_t newgap(size_t gap)
 {
-	char t;
-	do {
-		t = *p;
-		*p++ = *q;
-		*q++ = t;
-	} while (--size);
-	return;
+	gap = (gap * 10) / 13;
+	if (gap == 9 || gap == 10)
+		gap = 11;
+
+	if (gap < 1)
+		gap = 1;
+	return gap;
 }
 
-void qsort(void *base, size_t n, size_t size,
-	int (*cmp)(const void *, const void *))
+void qsort(void *base, size_t nmemb, size_t size,
+	   int (*compar) (const void *, const void *))
 {
-	size_t i, last;
-	if (size == 0)
+	size_t gap = nmemb;
+	size_t i, j;
+	char *p1, *p2;
+	int swapped;
+
+	if (!nmemb)
 		return;
-	if (n <= 1)
-		return;
-	swap(size, pV(0), pV(n / 2));
-	last = 0;
-	for (i = 1; i < n; i++)
-		if ((*cmp)(pV(i), pV(0)) < 0)
-			swap(size, pV(++last), pV(i));
-	swap(size, pV(0), pV(last));
-	qsort(pV(0), last, size, cmp);
-	qsort(pV(last + 1), n - last - 1, size, cmp);
-	return;
+
+	do {
+		gap = newgap(gap);
+		swapped = 0;
+
+		for (i = 0, p1 = base; i < nmemb - gap; i++, p1 += size) {
+			j = i + gap;
+			if (compar(p1, p2 = (char *)base + j * size) > 0) {
+				memswap(p1, p2, size);
+				swapped = 1;
+			}
+		}
+	} while (gap > 1 || swapped);
 }

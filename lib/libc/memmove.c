@@ -1,29 +1,36 @@
-//*****************************************************************************
-// memmove.c : memory function
-// 2002/02/04 by Gaku : this is rough sketch
-//*****************************************************************************
+/*
+ * memmove.c
+ */
 
-#include <stddef.h>
+#include <string.h>
 
-//=============================================================================
-// copy SZ bytes of S to D
-//   * guarantee - acceptable result for overlaped strings
-//=============================================================================
-void* memmove (void *d, void *s, size_t sz)
+void *memmove(void *dst, const void *src, size_t n)
 {
-	void *tmp = d;
-	char *dp = (char*)d;
-	char *sp = (char*)s;
-
-	if (dp > sp) {
-		dp += sz;
-		sp += sz;
-		while (sz--)
-			*--dp = *--sp;
+	const char *p = src;
+	char *q = dst;
+#if defined(__i386__) || defined(__x86_64__)
+	if (q < p) {
+		asm volatile("cld; rep; movsb"
+			     : "+c" (n), "+S"(p), "+D"(q));
 	} else {
-		while (sz--)
-			*dp++ = *sp++;
+		p += (n - 1);
+		q += (n - 1);
+		asm volatile("std; rep; movsb; cld"
+			     : "+c" (n), "+S"(p), "+D"(q));
 	}
+#else
+	if (q < p) {
+		while (n--) {
+			*q++ = *p++;
+		}
+	} else {
+		p += n;
+		q += n;
+		while (n--) {
+			*--q = *--p;
+		}
+	}
+#endif
 
-	return tmp;
+	return dst;
 }

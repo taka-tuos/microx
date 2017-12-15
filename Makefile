@@ -32,7 +32,7 @@ hdimage :
 	$(MAKE) vfat.img
 
 run : kernel bootcd.iso vfat.img
-	$(QEMU) -hda vfat.img -cdrom bootcd.iso -boot d
+	$(QEMU) -hda vfat.img -cdrom bootcd.iso -boot d -vga qxl
 	
 clean :
 	$(MAKE) -C lib clean

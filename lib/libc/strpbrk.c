@@ -1,25 +1,55 @@
-//*****************************************************************************
-// strpbrk.c : string function
-// 2002/02/04 by Gaku : this is rough sketch
-//*****************************************************************************
+/*
+FUNCTION
+	<<strpbrk>>---find characters in string
 
-#include <stdio.h>
-#include <stddef.h>
+INDEX
+	strpbrk
 
-//=============================================================================
-// search D of any character in S
-//=============================================================================
-char* strpbrk (char *d, const char *s)
+ANSI_SYNOPSIS
+	#include <string.h>
+	char *strpbrk(const char *<[s1]>, const char *<[s2]>);
+
+TRAD_SYNOPSIS
+	#include <string.h>
+	char *strpbrk(<[s1]>, <[s2]>)
+	char *<[s1]>;
+	char *<[s2]>;
+
+DESCRIPTION
+	This function locates the first occurence in the string
+	pointed to by <[s1]> of any character in string pointed to by
+	<[s2]> (excluding the terminating null character).
+
+RETURNS
+	<<strpbrk>> returns a pointer to the character found in <[s1]>, or a
+	null pointer if no character from <[s2]> occurs in <[s1]>.
+
+PORTABILITY
+<<strpbrk>> requires no supporting OS subroutines.
+*/
+
+#include <string.h>
+
+char *strpbrk(const char *s1, const char *s2)
 {
-	const char *bgn = s;
+  const char *c = s2;
+  if (!*s1)
+    return (char *) NULL;
 
-	while ('\0' != *d) {
-		while ('\0' != *s)
-			if (*d == *s++)
-				return d;
-		d++;
-		s = bgn;
+  while (*s1)
+    {
+      for (c = s2; *c; c++)
+	{
+	  if (*s1 == *c)
+	    break;
 	}
+      if (*c)
+	break;
+      s1++;
+    }
 
-	return NULL;
+  if (*c == '\0')
+    s1 = NULL;
+
+  return (char *) s1;
 }

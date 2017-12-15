@@ -1,26 +1,24 @@
-//*****************************************************************************
-// strncpy.c : string function
-// 2002/02/04 by Gaku : this is rough sketch
-//*****************************************************************************
+/*
+ * strncpy.c
+ */
 
-#include <stddef.h>
+#include <string.h>
 
-//=============================================================================
-// copy no more SZ bytes S to D
-//=============================================================================
-char* strncpy (char *d, const char *s, size_t sz)
+char *strncpy(char *dst, const char *src, size_t n)
 {
-	char *tmp = d;
+	char *q = dst;
+	const char *p = src;
+	char ch;
 
-	while ('\0' != *s) {
-		if (0 == sz)
+	while (n) {
+		n--;
+		*q++ = ch = *p++;
+		if (!ch)
 			break;
-		sz--;
-		*d++ = *s++;
 	}
 
-	while (sz--)
-		*d++ = '\0';
+	/* The specs say strncpy() fills the entire buffer with NUL.  Sigh. */
+	memset(q, 0, n);
 
-	return tmp;
+	return dst;
 }

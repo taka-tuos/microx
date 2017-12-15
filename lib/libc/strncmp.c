@@ -1,42 +1,21 @@
-//*****************************************************************************
-// strncmp.c : string function
-// 2002/02/04 by Gaku : this is rough sketch
-//*****************************************************************************
+/*
+ * strncmp.c
+ */
 
-#include <stddef.h>
+#include <string.h>
 
-//=============================================================================
-// compare no more SZ bytes D and S
-//=============================================================================
-int	strncmp (char *d, const char *s, size_t sz)
+int strncmp(const char *s1, const char *s2, size_t n)
 {
-#if 0
-	/* Gaku's code */
+	const unsigned char *c1 = (const unsigned char *)s1;
+	const unsigned char *c2 = (const unsigned char *)s2;
+	unsigned char ch;
+	int d = 0;
 
-	while ( sz-- && '\0' != *d ) {
-		if (*d != *s)
-			return *d - *s;
-		d++;
-		s++;
+	while (n--) {
+		d = (int)(ch = *c1++) - (int)*c2++;
+		if (d || !ch)
+			break;
 	}
-	return *d - *s; /* bug? (if sz == 0) */
 
-#endif
-
-#if 1
-	/* Kawai's code */
-
-	while (sz--) {
-		if (*d == '\0')
-			goto ret;
-		if (*d != *s) {
-ret:
-			return *d - *s;
-		}
-		d++;
-		s++;
-	}
-	return 0;
-#endif
-
+	return d;
 }

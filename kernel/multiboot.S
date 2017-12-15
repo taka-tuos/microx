@@ -27,6 +27,15 @@ multiboot_header:
     .long   DEF_MBH_MAGIC
     .long   DEF_MBH_FLAGS
     .long   DEF_MBH_CHECKSUM
+    .long 0
+    .long 0
+    .long 0
+    .long 0
+    .long 0
+    .long 0
+    .long 640
+    .long 480
+    .long 32
 
 _multi_boot_entry:
     cli

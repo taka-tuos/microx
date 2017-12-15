@@ -2,8 +2,8 @@ include ../../mkfiles/cflags.mk
 
 CFLAGS += -I../../include -L../../lib
 
-$(TARGET).eim : Makefile $(OBJS) ../app.lds
-	$(GCC) $(CFLAGS) -Wl,-T../app.lds,-Map=$(TARGET).map -o $(TARGET).eim $(OBJS) $(LIBS)
+$(TARGET).eim : Makefile $(OBJS) ../crt0.o ../app.lds
+	$(GCC) $(CFLAGS) -Wl,-T../app.lds,-Map=$(TARGET).map -o $(TARGET).eim $(OBJS) ../crt0.o $(LIBS)
 	$(COPY) $(TARGET).eim ../../fs_files/
 
 %.o : %.c Makefile

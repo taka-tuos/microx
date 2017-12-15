@@ -42,9 +42,9 @@ typedef enum {
 #define AM_DIR	0x10	/* Directory */
 #define AM_ARC	0x20	/* Archive */
 
-#define SK_END	0x00
+#define SK_SET	0x00
 #define SK_CUR	0x01
-#define SK_SET	0x02
+#define SK_END	0x02
 
 int x32_Open(const char *path, int mode);
 int x32_Close(int fd);
@@ -56,6 +56,7 @@ int x32_Tell(int fd);
 void x32_PutChar(int c);
 void x32_KeyboardEnable();
 int x32_Fifo32Status();
+void x32_Fifo32Put(int data);
 int x32_Fifo32Get();
 int x32_GetChar();
 void x32_Exit();

@@ -1,29 +1,21 @@
-//*****************************************************************************
-// strncat.c : string function
-// 2002/02/04 by Gaku : this is rough sketch
-//*****************************************************************************
+/*
+ * strncat.c
+ */
 
-#include <stddef.h>
+#include <string.h>
 
-//=============================================================================
-// append no more SZ bytes from S to D
-//=============================================================================
-char* strncat (char *d, const char *s, size_t sz)
+char *strncat(char *dst, const char *src, size_t n)
 {
-	char *tmp = d;
+	char *q = strchr(dst, '\0');
+	const char *p = src;
+	char ch;
 
-	while ('\0' != *d)
-		d++;
-
-	while ('\0' != *s) {
-		if (0 == sz)
-			break;
-		sz--;
-		*d++ = *s++;
+	while (n--) {
+		*q++ = ch = *p++;
+		if (!ch)
+			return dst;
 	}
+	*q = '\0';
 
-	if (sz)
-		*d = '\0';
-
-	return tmp;
+	return dst;
 }

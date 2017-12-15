@@ -4,6 +4,7 @@
 
 #include "memory.h"
 #include "console.h"
+#include "ff.h"
 
 #ifndef __WRAPPER_H__
 #define __WRAPPER_H__
@@ -90,4 +91,51 @@ static void wait_loop_usec(int usec)
 
 	while (timer_getticks() <= end) __asm__ __volatile__("nop\n\t");
 }
+/*
+static FILE *fopen(const char *path, const char *mode)
+{
+	BYTE modeb = *mode == 'r' ? FA_READ : FA_WRITE;
+	FILE *fp = kmalloc(sizeof(FILE));
+	
+	f_open(fp,path,modeb);
+	
+	return fp;
+}
+
+static void fclose(FILE *fp)
+{
+	f_close(fp);
+	
+	kfree(fp);
+}
+
+static void fseek(FILE *fp, int ofs, int org)
+{
+	int fofs = 0;
+	switch(org) {
+	case SEEK_CUR:
+		fofs = f_tell(fp) + ofs;
+		break;
+	case SEEK_END:
+		fofs = f_size(fp) - ofs;
+		break;
+	}
+	
+	f_lseek(fp, fofs);
+}
+
+static int ftell(FILE *fp)
+{
+	return f_tell(fp);
+}
+
+static int fread(void *p, int siz1, int siz2, FILE *fp)
+{
+	UINT br;
+	
+	f_read(fp, p, siz1*siz2,&br);
+	
+	return br;
+}*/
+
 #endif

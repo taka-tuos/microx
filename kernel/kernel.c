@@ -5,8 +5,13 @@
 #include "console.h"
 #include "bootpack.h"
 #include "ff.h"
+#include "sheet.h"
 
-#include "vga_font.h"
+#include "nvbdflib.h"
+
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_NO_SIMD
+#include "stb_image.h"
 
 #define __KERNEL__
 #include <sys/api.h>
@@ -15,9 +20,13 @@
 
 struct CONSOLE *cons;
 
+MULTIBOOT_INFO *mboot_info;
+
 FATFS *ata;
 
 struct FIFO32 ***fifo_list;
+
+struct SHTCTL *shtctl;
 
 #define KEYCMD_LED		0xed
 
@@ -166,25 +175,6 @@ struct TASK *fork(char *path)
 	fifo32_init(&(forktask->fifo), 128, fork_fifo, forktask);
 }
 
-const unsigned char table_rgb[16 * 3] = {
-	0x00, 0x00, 0x00,
-	0x00, 0x00, 0xaa,
-	0x00, 0xaa, 0x00,
-	0x00, 0xaa, 0xaa,
-	0xaa, 0x00, 0x00,
-	0xaa, 0x00, 0xaa,
-	0xaa, 0xaa, 0x00,
-	0xaa, 0xaa, 0xaa,
-	0x55, 0x55, 0x55,
-	0x55, 0x55, 0xff,
-	0x55, 0xff, 0x55,
-	0x55, 0xff, 0xff,
-	0xff, 0x55, 0x55,
-	0xff, 0x55, 0xff,
-	0xff, 0xff, 0x55,
-	0xff, 0xff, 0xff,
-};
-
 void kill_fork(struct TASK *task)
 {
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
@@ -201,20 +191,9 @@ void kill_fork(struct TASK *task)
 	return;
 }
 
-
-void set_palette(int start, int end, unsigned char *rgb)
+void dot(int x, int y, int c)
 {
-	int i, eflags;
-	io_cli();
-	io_out8(0x03c8, start);
-	for (i = start; i <= end; i++) {
-		io_out8(0x03c9, rgb[0] / 4);
-		io_out8(0x03c9, rgb[1] / 4);
-		io_out8(0x03c9, rgb[2] / 4);
-		rgb += 3;
-	}
-	io_sti();
-	return;
+	((unsigned int *)mboot_info->framebuffer_addr[0])[y * 640 + x] = 0xffffff * c;
 }
 
 void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
@@ -228,6 +207,8 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 	struct FIFO32 *fifolist_buf[FIFOTYPE_NUM][1024];
 	
 	FATFS fs;
+	
+	mboot_info = info;
 	
 	init_gdtidt(info);
 	init_pic();
@@ -255,26 +236,7 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 	
 	cons_initalize(cons);
 	
-	set_palette(0,16,table_rgb);
-	
-	io_out16(0x03ce,0x0005);
-	io_out16(0x03ce,0x0406);
-	io_out16(0x03c4,0x0402);
-	io_out16(0x03c4,0x0604);
-	
-	for(i = 0; i < 256; i++) {
-		for(j = 0; j < 16; j++) {
-			*((unsigned char *)((i * 32 + j) + 0xa0000)) = vga_font[i * 16 + j];
-		}
-	}
-	
-	io_out16(0x03c4,0x0302);
-	io_out16(0x03c4,0x0204);
-	io_out16(0x03ce,0x1005);
-	io_out16(0x03ce,0x0e06);
-	
-	for(int t = 0; t < FIFOTYPE_NUM; t++)
-		for(int l = 0; l < 1024; l++) fifo_list[t][l] = 0;
+	//set_palette(0,16,table_rgb);
 	
 	find_pci_device();
 	init_ata_disk_driver();
@@ -282,6 +244,66 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 	ata = &fs;
 	
 	f_mount(&fs,"",1);
+	
+	//shtctl = shtctl_init((unsigned int *)(info->framebuffer_addr[0]),info->framebuffer_width,info->framebuffer_height);
+	
+	//struct SHEET *sht = sheet_alloc(shtctl);
+	
+	//sheet_setbuf(sht,(unsigned int *)malloc(256*256*4),256,256,0xff000000);
+	
+	//sheet_updown(sht,1);
+	//sheet_slide(sht,0,0);
+	
+	/*unsigned int *fbp = (unsigned int *)sht->buf;
+	
+	for(int i = 0; i < 256; i++) {
+		for(int j = 0; j < 256; j++) {
+			//int col = 0x010101 * (128 - i*4);
+			int col = (i << 8) | j;
+			fbp[i*256+j] = col;
+		}
+	}*/
+	
+	//sheet_refresh(sht,0,0,256,256);
+	
+	//BDF_FONT *bdf = bdfReadPath("6x12.bdf");
+	
+	//printf("%08x\n",bdf->info.chars);
+	
+	//int w,h,bpp;
+	
+	//stbi_uc *b = stbi_load("pic.png",&w,&h,&bpp,4);
+	
+	//memcpy(sht->buf,b,256*256*4);
+	
+	//sheet_refresh(sht,0,0,256,256);
+	
+	//bdfSetDrawingAreaSize(256,256);
+	//bdfSetDrawingFunction(dot);
+	
+	//bdfPrintString(bdf,0,0,"MicroX First BDF Message!!\nWindows 10");
+	//char s[32];
+	//sprintf(s,"%08x",b);
+	//bdfPrintString(bdf,0,0,s);
+	
+	//io_out16(0x03ce,0x0005);
+	//io_out16(0x03ce,0x0406);
+	//io_out16(0x03c4,0x0402);
+	//io_out16(0x03c4,0x0604);
+	
+	/*for(i = 0; i < 256; i++) {
+		for(j = 0; j < 16; j++) {
+			*((unsigned char *)((i * 32 + j) + 0xa0000)) = vga_font[i * 16 + j];
+		}
+	}*/
+	
+	//io_out16(0x03c4,0x0302);
+	//io_out16(0x03c4,0x0204);
+	//io_out16(0x03ce,0x1005);
+	//io_out16(0x03ce,0x0e06);
+	
+	for(int t = 0; t < FIFOTYPE_NUM; t++)
+		for(int l = 0; l < 1024; l++) fifo_list[t][l] = 0;
 	
 	fork("init.eim");
 	
@@ -467,8 +489,10 @@ int *microx_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, i
 	
 	int id = p[0];
 	
+	//printf("API 0x%02x", id);
+	
 	if(id == mx32api_putchar) {
-		printk("%c",p[1] & 0xff);
+		putchar(p[1] & 0xff);
 	} else if(id == mx32api_exit) {
 		//printk("EXIT");
 		return &(task->tss.esp0);
@@ -542,4 +566,175 @@ int *microx_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, i
 	}
 	
 	return 0;
+}
+
+extern struct File_methods mth;
+
+FILE *__open(char *path, char *mode)
+{
+	FILE *f = (FILE *)malloc(sizeof(FILE));
+	
+	BYTE m = 0;
+	if(strchr(mode,'r')) m |= FA_READ;
+	if(strchr(mode,'w')) m |= FA_WRITE;
+	
+	printk("%02x\n",m);
+	
+	f->obj = (FIL *)malloc(sizeof(FIL));
+	
+	f->vmt = &mth;
+	
+	f_open((FIL *)f->obj,path,m);
+	
+	return f;
+}
+
+size_t __write(FILE* instance, const char *bp, size_t n);
+size_t __read(FILE* instance, char *bp, size_t n);
+int __close(FILE* instance);
+int __seek(FILE* instance, size_t offset, int base);
+long __tell(FILE* instance);
+int __eof(FILE* instance);
+
+struct File_methods mth = {
+	.write = __write,
+	.read = __read,
+	.close = __close,
+	.seek = __seek,
+	.tell = __tell,
+	.eof = __eof,
+};
+
+FILE const __stdin = {
+	(void *)1, &mth
+};
+
+FILE const __stdout = {
+	(void *)2, &mth
+};
+
+FILE const __stderr = {
+	(void *)2, &mth
+};
+
+FILE* const stdin = &__stdin;
+FILE* const stdout = &__stdout;
+FILE* const stderr = &__stderr;
+
+size_t __write(FILE* instance, const char *bp, size_t n)
+{
+	struct TASK *task = task_now();
+	int i;
+	switch((int)instance->obj) {
+	case 1:
+		for(i = 0; i < n; i++) fifo32_put(&(task->fifo),bp[i]);
+		return i;
+	case 2:
+		cons_putstr1(cons, bp, n);
+		return n;
+	}
+	
+	UINT bw;
+	f_write((FIL *)instance->obj, bp, n, &bw);
+	
+	return bw;
+}
+
+size_t __read(FILE* instance, char *bp, size_t n)
+{
+	struct TASK *task = task_now();
+	int i;
+	switch((int)instance->obj) {
+	case 1:
+		for(i = 0; i < n && fifo32_status(&(task->fifo)); i++) bp[i] = fifo32_get(&(task->fifo));
+		return i;
+	case 2:
+		return 0;
+	}
+	
+	UINT br;
+	f_read((FIL *)instance->obj, bp, n, &br);
+	
+	return br;
+}
+
+int __close(FILE* instance)
+{
+	switch((int)instance->obj) {
+	case 1:
+		return -1;
+	case 2:
+		return -1;
+	}
+	
+	return f_close(instance->obj);
+}
+
+int __seek(FILE* instance, size_t offset, int base)
+{
+	switch((int)instance->obj) {
+	case 1:
+		return -1;
+	case 2:
+		return -1;
+	}
+	
+	int fofs = offset;
+	
+	switch(base) {
+	case SEEK_CUR:
+		fofs = f_tell((FIL *)instance->obj) + offset;
+		break;
+	case SEEK_END:
+		fofs = f_size((FIL *)instance->obj) - offset;
+		break;
+	}
+	
+	//printk("SEEK %d:%d (%d)\n", base, offset, fofs);
+	
+	return f_lseek((FIL *)instance->obj, fofs);
+}
+
+long __tell(FILE* instance)
+{
+	switch((int)instance->obj) {
+	case 1:
+		return -1;
+	case 2:
+		return -1;
+	}
+	
+	return f_tell((FIL *)instance->obj);
+}
+
+int __eof(FILE *instance)
+{
+	return f_eof((FIL *)instance->obj);
+}
+
+void *__malloc(size_t siz)
+{
+	return kmalloc(siz);
+}
+
+void __free(void *ptr)
+{
+	kfree(ptr);
+}
+
+void __assert_fail(const char *s, const char *f, unsigned int l)
+{
+	printf("ASSERT FAILED %s : %s:%d\n",s,f,l);
+	for(;;);
+}
+
+int pow(int x, int n)
+{
+	if(n == 2) return x*x;
+	return pow(x,n-1); 
+}
+
+double ldexp(double x, int exp)
+{
+	return x * pow(2,exp);
 }

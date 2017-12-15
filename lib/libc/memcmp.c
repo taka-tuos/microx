@@ -1,24 +1,19 @@
-//*****************************************************************************
-// memcmp.c : memory function
-// 2002/02/04 by Gaku : this is rough sketch
-//*****************************************************************************
+/*
+ * memcmp.c
+ */
 
-#include <stddef.h>
+#include <string.h>
 
-//=============================================================================
-// compare SZ bytes of D and S
-//=============================================================================
-int memcmp (const void *d, const void *s, size_t sz)
+int memcmp(const void *s1, const void *s2, size_t n)
 {
-	const char *dp = (const char*) d;
-	const char *sp = (const char*) s;
+	const unsigned char *c1 = s1, *c2 = s2;
+	int d = 0;
 
-	while (sz--) {
-		if (*dp != *sp)
-			return *dp - *sp;
-		dp++;
-		sp++;
+	while (n--) {
+		d = (int)*c1++ - (int)*c2++;
+		if (d)
+			break;
 	}
 
-	return 0;
+	return d;
 }

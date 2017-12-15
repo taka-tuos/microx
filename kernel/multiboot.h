@@ -45,7 +45,7 @@
 ----------------------------------------------------------------------------------
 */
 /* Flags for elf kernel image                          */
-#define DEF_MBH_FLAGS           ( DEF_MBH_FLAGS_PAGE_ALIGN | DEF_MBH_FLAGS_MEMORY_INFO )
+#define DEF_MBH_FLAGS           ( DEF_MBH_FLAGS_PAGE_ALIGN | DEF_MBH_FLAGS_MEMORY_INFO | DEF_MBH_FLAGS_VIDEO_MODE )
 /* Flags for binary kernel image                       */
 #define DEF_MBH_FLAGS_BIN       ( DEF_MBH_FLAGS_PAGE_ALIGN | DEF_MBH_FLAGS_MEMORY_INFO | DEF_MBH_FLAGS_AOUT_KLUDGE )
 #define DEF_MBH_CHECKSUM        ( - ( DEF_MBH_MAGIC + DEF_MBH_FLAGS     ) )
@@ -138,6 +138,13 @@ typedef struct
     UINT32  vbe_interface_seg;
     UINT32  vbe_interface_off;
     UINT32  vbe_interface_len;
+    
+    UINT32  framebuffer_addr[2];
+    UINT32  framebuffer_pitch;
+    UINT32  framebuffer_width;
+    UINT32  framebuffer_height;
+    UINT32  framebuffer_bpp;
+    UINT32  framebuffer_type;
 }MULTIBOOT_INFO;
 
 #endif	/* __MULTIBOOT_HEADER_H  */

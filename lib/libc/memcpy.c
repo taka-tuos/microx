@@ -1,21 +1,29 @@
-//*****************************************************************************
-// memcpy.c : memory function
-// 2002/02/04 by Gaku : this is rough sketch
-//*****************************************************************************
+/*
+ * memcpy.c
+ */
 
-#include <stddef.h>
+#include <string.h>
+#include <stdint.h>
 
-//=============================================================================
-// copy SZ bytes of S to D
-//=============================================================================
-void* memcpy (void *d, void *s, size_t sz)
+void *memcpy(void *dst, const void *src, size_t n)
 {
-	void *tmp = d;
-	char *dp = (char*)d;
-	char *sp = (char*)s;
+	const char *p = src;
+	char *q = dst;
+#if defined(__i386__)
+	size_t nl = n >> 2;
+	asm volatile ("cld ; rep ; movsl ; movl %3,%0 ; rep ; movsb":"+c" (nl),
+		      "+S"(p), "+D"(q)
+		      :"r"(n & 3));
+#elif defined(__x86_64__)
+	size_t nq = n >> 3;
+	asm volatile ("cld ; rep ; movsq ; movl %3,%%ecx ; rep ; movsb":"+c"
+		      (nq), "+S"(p), "+D"(q)
+		      :"r"((uint32_t) (n & 7)));
+#else
+	while (n--) {
+		*q++ = *p++;
+	}
+#endif
 
-	while (sz--)
-		*dp++ = *sp++;
-
-	return tmp;
+	return dst;
 }

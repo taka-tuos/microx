@@ -1,26 +1,19 @@
-//*****************************************************************************
-// strrchr.c : string function
-// 2002/02/04 by Gaku : this is rough sketch
-//*****************************************************************************
+/*
+ * strrchr.c
+ */
 
-#include <stdio.h>
-#include <stddef.h>
+#include <string.h>
 
-//=============================================================================
-// search the last occur of C in D
-//=============================================================================
-char* strrchr (char *d, int c)
+char *strrchr(const char *s, int c)
 {
-	char *tmp = d;
+	const char *found = NULL;
 
-	while ('\0' != *d)
-		d++;
-
-	while (tmp <= d) {
-		if (c == *d)
-			return d;
-		d--;
+	while (*s) {
+		if (*s == (char)c)
+			found = s;
+		s++;
 	}
 
-	return NULL;
+	return (char *)found;
 }
+

@@ -1,24 +1,20 @@
-//*****************************************************************************
-// strcpy.c : string function
-// 2002/02/04 by Gaku : this is rough sketch
-//*****************************************************************************
+/*
+ * strcpy.c
+ *
+ * strcpy()
+ */
 
-#include <stddef.h>
+#include <string.h>
 
-//=============================================================================
-// copy S to D
-//=============================================================================
-char* strcpy (char *d, const char *s)
+char *strcpy(char *dst, const char *src)
 {
-	char *tmp = d;
+	char *q = dst;
+	const char *p = src;
+	char ch;
 
-#if 0
-	while ('\0' != *s)
-		*d++ = *s++;
+	do {
+		*q++ = ch = *p++;
+	} while (ch);
 
-	*d = '\0';
-#endif
-	while ((*d++ = *s++) != '\0');
-
-	return tmp;
+	return dst;
 }

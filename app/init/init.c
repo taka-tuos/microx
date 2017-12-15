@@ -1,19 +1,15 @@
 #include <sys/api.h>
 #include <stdio.h>
 
-#include "xprintf.h"
-
 //unsigned char fb[640*480/2];
 
-void MicroMain(void)
+int main(void)
 {
 	//DIR Dir;
 	//FILINFO Finfo;
 	
 	//int res,p1,s1,s2;
 	//res = f_opendir(&Dir,"/");
-	
-	xdev_out(x32_PutChar);
 	
 	//fbblt(fb);
 	
@@ -55,16 +51,16 @@ void MicroMain(void)
 	
 	//f_closedir(&Dir);
 	
-	int fd;
+	FILE *fp;
 	char s[256];
-	fd = x32_Open("README.MD",FA_READ);
+	fp = fopen("README.MD","rb");
 	
-	while(x32_Read(fd,s,1)) x32_PutChar(s[0]);
-	x32_Close(fd);
+	while(!feof(fp)) puts(fgets(s,256,fp));
+	fclose(fp);
 	
-	xprintf("END\n");
+	printf("END\n");
 	
-	for(int i = 0;; i++) xprintf("scroll!! %d\n",i);
+	//for(int i = 0;; i++) xprintf("scroll!! %d\n",i);
 	
-	x32_Exit();
+	return 0;
 }

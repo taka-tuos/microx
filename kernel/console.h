@@ -2,7 +2,7 @@
 #define __CONSOLE__
 
 #define VRAM				0xb8000
-#define	MAX_Y				25
+#define	MAX_Y				30
 #define	MAX_X				80
 #define	MAX_XY				(MAX_X*MAX_Y)
 

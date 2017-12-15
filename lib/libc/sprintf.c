@@ -1,16 +1,18 @@
-/* copyright(C) 2003 H.Kawai (under KL-01). */
+/*
+ * sprintf.c
+ */
 
-#include <stdarg.h>
 #include <stdio.h>
+#include <unistd.h>
 
-int sprintf(char *s, const char *format, ...)
+int sprintf(char *buffer, const char *format, ...)
 {
-	int i;
 	va_list ap;
+	int rv;
 
 	va_start(ap, format);
-	i = vsprintf(s, format, ap);
+	rv = vsnprintf(buffer, ~(size_t) 0, format, ap);
 	va_end(ap);
-	return i;
-}
 
+	return rv;
+}

@@ -1,4 +1,5 @@
 #include <sys/api.h>
+#include <stdio.h>
 
 void x32_ApiCall(int *p)
 {
@@ -36,6 +37,14 @@ int x32_Fifo32Get()
 	p[0] = mx32api_fifo32_get;
 	x32_ApiCall(p);
 	return p[1];
+}
+
+void x32_Fifo32Put(int data)
+{
+	int p[32];
+	p[0] = mx32api_fifo32_put;
+	p[1] = data;
+	x32_ApiCall(p);
 }
 
 int x32_GetChar()
@@ -145,4 +154,148 @@ void x32_Free(void *ptr)
 	p[0] = mx32api_free;
 	p[1] = ptr;
 	x32_ApiCall(p);
+}
+
+/* libc wrapper */
+extern struct File_methods mth;
+
+FILE *__open(char *path, char *mode)
+{
+	FILE *f = (FILE *)malloc(sizeof(FILE));
+	
+	int m = 0;
+	if(strchr(mode,'r')) m |= FA_READ;
+	if(strchr(mode,'w')) m |= FA_WRITE;
+	
+	f->obj = x32_Open(path,m);
+	
+	f->vmt = &mth;
+	
+	return f;
+}
+
+size_t __write(FILE* instance, const char *bp, size_t n);
+size_t __read(FILE* instance, char *bp, size_t n);
+int __close(FILE* instance);
+int __seek(FILE* instance, size_t offset, int base);
+long __tell(FILE* instance);
+int __eof(FILE* instance);
+
+struct File_methods mth = {
+	.write = __write,
+	.read = __read,
+	.close = __close,
+	.seek = __seek,
+	.tell = __tell,
+	.eof = __eof,
+};
+
+FILE const __stdin = {
+	(void *)1, &mth
+};
+
+FILE const __stdout = {
+	(void *)2, &mth
+};
+
+FILE const __stderr = {
+	(void *)2, &mth
+};
+
+FILE* const stdin = &__stdin;
+FILE* const stdout = &__stdout;
+FILE* const stderr = &__stderr;
+
+size_t __write(FILE* instance, const char *bp, size_t n)
+{
+	int i;
+	switch((int)instance->obj) {
+	case 1:
+		for(i = 0; i < n; i++) x32_Fifo32Put(bp[i]);
+		return i;
+	case 2:
+		for(i = 0; i < n; i++) x32_PutChar(bp[i]);
+		return n;
+	}
+	
+	return x32_Write((int)instance->obj,bp,n);
+}
+
+size_t __read(FILE* instance, char *bp, size_t n)
+{
+	int i;
+	switch((int)instance->obj) {
+	case 1:
+		for(i = 0; i < n && x32_Fifo32Status(); i++) bp[i] = x32_Fifo32Get();
+		return i;
+	case 2:
+		return 0;
+	}
+	
+	return x32_Read((int)instance->obj,bp,n);
+}
+
+int __close(FILE* instance)
+{
+	switch((int)instance->obj) {
+	case 1:
+		return -1;
+	case 2:
+		return -1;
+	}
+	
+	return x32_Close(instance->obj);
+}
+
+int __seek(FILE* instance, size_t offset, int base)
+{
+	switch((int)instance->obj) {
+	case 1:
+		return -1;
+	case 2:
+		return -1;
+	}
+	
+	return x32_Lseek((int)instance->obj, offset, base);
+}
+
+long __tell(FILE* instance)
+{
+	switch((int)instance->obj) {
+	case 1:
+		return -1;
+	case 2:
+		return -1;
+	}
+	
+	return x32_Tell((int)instance->obj);
+}
+
+int __eof(FILE *instance)
+{
+	int fd = (int)instance->obj;
+	
+	int cur = x32_Tell(fd);
+	x32_Lseek(fd,0,SK_END);
+	int end = x32_Tell(fd);
+	
+	x32_Lseek(fd,cur,SK_SET);
+	
+	return cur == end ? 1 : 0;
+}
+
+void *__malloc(size_t siz)
+{
+	return x32_Malloc(siz);
+}
+
+void __free(void *ptr)
+{
+	x32_Free(ptr);
+}
+
+void __assert_fail(const char *s, const char *f, unsigned int l)
+{
+	printf("ASSERT FAILED %s : %s:%d\n",s,f,l);
+	for(;;);
 }

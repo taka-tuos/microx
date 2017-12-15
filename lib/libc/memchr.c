@@ -1,22 +1,18 @@
-//*****************************************************************************
-// memchr.c : memory function
-// 2002/02/04 by Gaku : this is rough sketch
-//*****************************************************************************
+/*
+ * memchr.c
+ */
 
-#include <stdio.h>
 #include <stddef.h>
+#include <string.h>
 
-//=============================================================================
-// search SZ bytes of D for C
-//=============================================================================
-void* memchr (void *d, int c, size_t sz)
+void *memchr(const void *s, int c, size_t n)
 {
-	char *dp = (char*)d;
+	const unsigned char *sp = s;
 
-	while (sz--) {
-		if (c == *dp)
-			return dp;
-		dp++;
+	while (n--) {
+		if (*sp == (unsigned char)c)
+			return (void *)sp;
+		sp++;
 	}
 
 	return NULL;
