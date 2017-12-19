@@ -156,6 +156,19 @@ void x32_Free(void *ptr)
 	x32_ApiCall(p);
 }
 
+int x32_CreateWindow(void *buf, int w, int h, int inv, char *title)
+{
+	int p[32];
+	p[0] = mx32api_createwindow;
+	p[1] = buf;
+	p[2] = w;
+	p[3] = h;
+	p[4] = inv;
+	p[5] = title;
+	x32_ApiCall(p);
+	return p[15];
+}
+
 /* libc wrapper */
 extern struct File_methods mth;
 

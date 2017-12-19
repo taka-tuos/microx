@@ -4,7 +4,7 @@
 .extern _kernel_entry
 .extern microx_api
 
-.extern inthandler20, inthandler21, inthandler07
+.extern inthandler20, inthandler21, inthandler2c, inthandler07
 
 .section .bss
 .align 16
@@ -33,8 +33,8 @@ multiboot_header:
     .long 0
     .long 0
     .long 0
-    .long 640
-    .long 480
+    .long 800
+    .long 600
     .long 32
 
 _multi_boot_entry:
@@ -57,13 +57,13 @@ loop_infinite:
 .global io_out8, io_out16, io_out32
 .global io_load_eflags, io_store_eflags
 .global store_cr0, load_cr0
-.global asm_inthandler21, asm_inthandler20
+.global asm_inthandler21, asm_inthandler20, asm_inthandler2c
 .global io_hlt, io_cli, io_sti, io_stihlt
 .global io_load_eflags, io_store_eflags
 .global load_tr, farjmp
 .global load_gdtr, load_idtr
 .global read_cs, read_ss
-.global asm_microx_api, start_app
+.global asm_microx_api, start_app, asm_end_app;
 .global asm_inthandler07, clts, fnsave, frstor
 
 io_in8:		# void io_in8(int port)
@@ -132,6 +132,24 @@ asm_inthandler21:
 	movw	%ax, %ds
 	movw	%ax, %es
 	call	inthandler21
+	popl	%eax
+
+	popa
+	popw	%ds
+	popw	%es
+	iret
+	
+asm_inthandler2c:
+	pushw	%es
+	pushw	%ds
+	pusha
+	
+	movl	%esp, %eax
+	pushl	%eax
+	movw	%ss, %ax
+	movw	%ax, %ds
+	movw	%ax, %es
+	call	inthandler2c
 	popl	%eax
 
 	popa

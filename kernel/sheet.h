@@ -10,7 +10,7 @@ struct SHEET {
 	int flag2;
 	int act;
 	struct SHTCTL *ctl;
-	int task;
+	struct TASK *task;
 	void *ext;
 };
 struct SHTCTL {

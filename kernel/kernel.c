@@ -20,13 +20,19 @@
 
 struct CONSOLE *cons;
 
+BDF_FONT *bdf;
+
 MULTIBOOT_INFO *mboot_info;
+
+struct SHEET *sht_back;
 
 FATFS *ata;
 
 struct FIFO32 ***fifo_list;
 
 struct SHTCTL *shtctl;
+
+unsigned int mdata[4];
 
 #define KEYCMD_LED		0xed
 
@@ -80,6 +86,26 @@ const int keytable[2][128] = {
 	}
 };
 
+void keywin_off(struct SHEET *key_win)
+{
+	change_wtitle8(key_win, 0);
+	if ((key_win->flags & 0x20) != 0) {
+		fifo32_put(&key_win->task->fifo, 3); /* コンソールのカーソルOFF */
+	}
+	key_win->act = 0;
+	return;
+}
+
+void keywin_on(struct SHEET *key_win)
+{
+	change_wtitle8(key_win, 1);
+	if ((key_win->flags & 0x20) != 0) {
+		fifo32_put(&key_win->task->fifo, 2); /* コンソールのカーソルON */
+	}
+	key_win->act = 1;
+	return;
+}
+
 void fork_exit(void)
 {
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
@@ -101,8 +127,11 @@ void fork_task(char *path)
 	UINT dmy;
 	FIL *fd;
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
+	FIL *fhandle[8];
 	
 	fd = (FIL *) memman_alloc_4k(memman, sizeof(FIL));
+	
+	for(i = 0; i < 8; i++) fhandle[i] = 0;
 	
 	int r = f_open(fd,path,FA_READ);
 	
@@ -119,6 +148,7 @@ void fork_task(char *path)
 			q = (char *) memman_alloc_4k(memman, segsiz);
 			task->ds_base = (int) q;
 			task->cs_base = (int) p;
+			task->fhandle = fhandle;
 			
 			int malloc_ctl = *((int *)&p[0x20]);
 			int malloc_adr = *((int *)&p[0x20])+32*1024;
@@ -140,6 +170,22 @@ void fork_task(char *path)
 			}
 			
 			start_app(0x1b, 0 * 8 + 4, esp, 1 * 8 + 4, &(task->tss.esp0));
+			
+			struct SHEET *sht;
+	
+			for (i = 0; i < MAX_SHEETS; i++) {
+				sht = &(shtctl->sheets0[i]);
+				if ((sht->flags & 0x11) == 0x11 && sht->task == task) {
+					sheet_free(sht);
+				}
+			}
+			
+			for (i = 0; i < 8; i++) {
+				if(task->fhandle[i]) {
+					f_close(task->fhandle[i]);
+				}
+			}
+			
 			memman_free_4k(memman, (int) q, segsiz);
 		} else {
 			printk("%s is not executable file\n", path);
@@ -152,7 +198,7 @@ void fork_task(char *path)
 	for(int t = 0; t < FIFOTYPE_NUM; t++)
 		for(int l = 0; l < 1024; l++) if(fifo_list[t][l] == &task->fifo) fifo_list[t][l] = 0;
 	
-	//printk("killed\n");
+	printk("killed\n");
 	
 	fork_exit();
 }
@@ -191,24 +237,26 @@ void kill_fork(struct TASK *task)
 	return;
 }
 
-void dot(int x, int y, int c)
-{
-	((unsigned int *)mboot_info->framebuffer_addr[0])[y * 640 + x] = 0xffffff * c;
-}
-
 void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 {
 	struct FIFO32 fifo, keycmd;
 	int fifobuf[128], keycmd_buf[32];
 	struct TASK *task_a, *task;
 	int key_shift = 0, key_leds = 0, keycmd_wait = -1;
-	int i, j;
+	int i, j, x, y, mmx = -1, mmy = -1, mmx2 = 0;
+	int mx, my, new_mx = -1, new_my = 0, new_wx = 0x7fffffff, new_wy = 0;
+	struct SHEET *sht, *key_win;
+	
+	struct MOUSE_DEC mdec;
 	
 	struct FIFO32 *fifolist_buf[FIFOTYPE_NUM][1024];
 	
 	FATFS fs;
 	
 	mboot_info = info;
+	
+	MAX_X = info->framebuffer_width / 8;
+	MAX_Y = info->framebuffer_height / 8;
 	
 	init_gdtidt(info);
 	init_pic();
@@ -217,8 +265,9 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 	*((int *) 0x0fec) = (int) &fifo;
 	init_pit();
 	init_keyboard(&fifo, 256);
-	io_out8(PIC0_IMR, 0xf8); /* PITとPIC1とキーボードを許可(11111000) */
-	io_out8(PIC1_IMR, 0xff); /* 割り込み禁止(11111111) */
+	enable_mouse(&fifo, 512, &mdec);
+	io_out8(PIC0_IMR, 0xb8); /* PITとPIC1とキーボードを許可(10111000) */
+	io_out8(PIC1_IMR, 0xef); /* マウスを許可(11101111) */
 	fifo32_init(&keycmd, 32, keycmd_buf, 0);
 	
 	struct MEMMAN *memman = (struct MEMMAN *) MEMMAN_ADDR;
@@ -245,14 +294,17 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 	
 	f_mount(&fs,"",1);
 	
-	//shtctl = shtctl_init((unsigned int *)(info->framebuffer_addr[0]),info->framebuffer_width,info->framebuffer_height);
+	bdf = bdfReadPath("6x12.bdf");
+	
+	bdfSetDrawingFunction(bdfDot);
+	
+	shtctl = shtctl_init((unsigned int *)(info->framebuffer_addr[0]),info->framebuffer_width,info->framebuffer_height);
 	
 	//struct SHEET *sht = sheet_alloc(shtctl);
 	
 	//sheet_setbuf(sht,(unsigned int *)malloc(256*256*4),256,256,0xff000000);
 	
-	//sheet_updown(sht,1);
-	//sheet_slide(sht,0,0);
+	//dot_x = sht;
 	
 	/*unsigned int *fbp = (unsigned int *)sht->buf;
 	
@@ -264,19 +316,70 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 		}
 	}*/
 	
-	//sheet_refresh(sht,0,0,256,256);
+	sht_back = sheet_alloc(shtctl);
 	
-	//BDF_FONT *bdf = bdfReadPath("6x12.bdf");
+	sht_back->flag2 = 1;
+	
+	sheet_setbuf(sht_back,(unsigned int *)malloc(info->framebuffer_width*info->framebuffer_height*4),info->framebuffer_width,info->framebuffer_height,-1);
+	
+	for(int x = 0; x < info->framebuffer_width; x++) {
+		for(int y = 0; y < info->framebuffer_height; y++) {
+			float fx = ((float)x / (float)info->framebuffer_width) * 256.0f;
+			float fy = ((float)y / (float)info->framebuffer_height) * 256.0f;
+			int fc = (((int)fy) << 8) | ((int)fx);
+			sht_back->buf[y * sht_back->bxsize + x] = fc;
+		}
+	}
+	
+	sheet_updown(sht_back,0);
+	sheet_slide(sht_back,0,0);
+	
+	sheet_refresh(sht_back,0,0,info->framebuffer_width,info->framebuffer_height);
+	
+	struct SHEET *mouse = sheet_alloc(shtctl);
+	
+	{
+		int w,h,bpp;
+		stbi_uc *mgrp = stbi_load("cursor.png",&w,&h,&bpp,4);
+		swaprgb((unsigned int*)mgrp, w, h);
+		
+		sheet_setbuf(mouse,(unsigned int *)mgrp,w,h,0xff007f7f);
+	}
+	
+	sheet_updown(mouse,3);
+	sheet_slide(mouse,0,0);
+	
+	sheet_refresh(mouse,0,0,128,128);
+	
+	static char closebtn[14][16] = {
+		"OOOOOOOOOOOOOOO@", "OQQQQQQQQQQQQQ$@", "OQQQQQQQQQQQQQ$@",
+		"OQQQ@@QQQQ@@QQ$@", "OQQQQ@@QQ@@QQQ$@", "OQQQQQ@@@@QQQQ$@",
+		"OQQQQQQ@@QQQQQ$@", "OQQQQQ@@@@QQQQ$@", "OQQQQ@@QQ@@QQQ$@",
+		"OQQQ@@QQQQ@@QQ$@", "OQQQQQQQQQQQQQ$@", "OQQQQQQQQQQQQQ$@",
+		"O$$$$$$$$$$$$$$@", "@@@@@@@@@@@@@@@@"};
+	
+	/*for(i=0;i<2;i++){
+		struct SHEET *sht_win = sheet_alloc(shtctl);
+	
+		sheet_setbuf(sht_win,(unsigned int *)malloc(256*256*4),256,256,-1);
+		
+		make_window(sht_win,"MicroX First Window");
+		
+		sheet_slide(sht_win,32+i*16,32+i*16);
+		sheet_updown(sht_win, shtctl->top);
+	}*/
+	
+	//bdfPrintString(bdf,4,5,"MicroX First Window");
 	
 	//printf("%08x\n",bdf->info.chars);
 	
-	//int w,h,bpp;
+	/*int w,h,bpp;
 	
-	//stbi_uc *b = stbi_load("pic.png",&w,&h,&bpp,4);
+	stbi_uc *b = stbi_load("pic.png",&w,&h,&bpp,4);
 	
-	//memcpy(sht->buf,b,256*256*4);
+	swaprgb((unsigned int*)b, w, h);
 	
-	//sheet_refresh(sht,0,0,256,256);
+	memcpy(sht->buf,b,256*256*4);*/
 	
 	//bdfSetDrawingAreaSize(256,256);
 	//bdfSetDrawingFunction(dot);
@@ -310,8 +413,7 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 	int ps2_skip = 0;
 	int ps2_state = 0;
 	
-	while(1)
-	{
+	while(1) {
 		if(fifo32_status(&fifo) != 0) {
 			i = fifo32_get(&fifo);
 			if (1024 <= i && i <= 2023) {
@@ -439,9 +541,117 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 				key_leds |= (ps2_state & SCROLL) * 1;
 				fifo32_put(&keycmd, KEYCMD_LED);
 				fifo32_put(&keycmd, key_leds);
+			} else if (512 <= i && i <= 767) { /* マウスデータ */
+				if (mouse_decode(&mdec, i - 512) != 0) {
+					/* マウスカーソルの移動 */
+					mx += mdec.x;
+					my += mdec.y;
+					if (mx < 0) {
+						mx = 0;
+					}
+					if (my < 0) {
+						my = 0;
+					}
+					if (mx > info->framebuffer_width - 1) {
+						mx = info->framebuffer_width - 1;
+					}
+					if (my > info->framebuffer_height - 1) {
+						my = info->framebuffer_height - 1;
+					}
+					
+					mdata[0] = mx;
+					mdata[1] = my;
+					new_mx = mx;
+					new_my = my;
+					
+					//sheet_slide(mouse, new_mx, new_my);
+//#if 0
+					if ((mdec.btn & 0x01) != 0) {
+						/* 左ボタンを押している */
+						mdata[2] = 1;
+						if (mmx < 0) {
+							/* 通常モードの場合 */
+							/* 上の下じきから順番にマウスが指している下じきを探す */
+							for (j = shtctl->top - 1; j > 0; j--) {
+								sht = shtctl->sheets[j];
+								x = mx - sht->vx0;
+								y = my - sht->vy0;
+								if (0 <= x && x < sht->bxsize && 0 <= y && y < sht->bysize) {
+									if (sht->buf[y * sht->bxsize + x] != sht->col_inv && sht->flag2 == 0) {
+										sheet_updown(sht, shtctl->top - 1);
+										if (sht != key_win) {
+											if(key_win->act == 1) keywin_off(key_win);
+											key_win = sht;
+											if(key_win->act == 0) keywin_on(key_win);
+										}
+										if ((3 <= x && x < sht->bxsize - 3 && 3 <= y && y < 21) && sht->flag2 == 0) {
+											mmx = mx;	/* ウィンドウ移動モードへ */
+											mmy = my;
+											mmx2 = sht->vx0;
+											new_wy = sht->vy0;
+										}
+										if (sht->bxsize - 21 <= x && x < sht->bxsize - 5 && 5 <= y && y < 19) {
+												/* 「×」ボタンクリック */
+											if ((sht->flags & 0x10) != 0) {		/* アプリが作ったウィンドウか？ */
+												task = sht->task;
+												io_cli();	/* 強制終了処理中にタスクが変わると困るから */
+												task->tss.eax = (int) &(task->tss.esp0);
+												task->tss.eip = (int) asm_end_app;
+												io_sti();
+												task_run(task, -1, 0);
+											} else {	/* コンソールなど */
+												task = sht->task;
+												sheet_updown(sht, -1); /* とりあえず非表示にしておく */
+												keywin_off(key_win);
+												key_win = shtctl->sheets[shtctl->top - 1];
+												keywin_on(key_win);
+												io_cli();
+												fifo32_put(&task->fifo, 4);
+												io_sti();
+											}
+										}
+										break;
+									}
+								}
+							}
+						} else {
+							/* ウィンドウ移動モードの場合 */
+							mdata[2] = 0;
+							x = mx - mmx;	/* マウスの移動量を計算 */
+							y = my - mmy;
+							new_wx = mmx2 + x;
+							new_wy = new_wy + y;
+							mmy = my;	/* 移動後の座標に更新 */
+						}
+					} else if (mdec.btn & 0x02) {
+						/* 右ボタン */
+						mdata[3] = 1;
+					} else {
+						/* 左ボタンを押していない */
+						mdata[2] = 0;
+						mdata[3] = 0;
+						mmx = -1;	/* 通常モードへ */
+						if (new_wx != 0x7fffffff) {
+							sheet_slide(sht, new_wx, new_wy);	/* 一度確定させる */
+							new_wx = 0x7fffffff;
+						}
+					}
+//#endif
+				}
 			}
 		} else {
-			task_sleep(task_a);
+			if (new_mx >= 0) {
+				//io_sti();
+				sheet_slide(mouse, new_mx, new_my);
+				//printf("MOUSE\n");
+				new_mx = -1;
+			} else if (new_wx != 0x7fffffff) {
+				//io_sti();
+				sheet_slide(sht, new_wx, new_wy);
+				new_wx = 0x7fffffff;
+			} else {
+				task_sleep(task_a);
+			}
 		}
 	}
 }
@@ -521,14 +731,30 @@ int *microx_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, i
 			}
 		}
 	} else if(id == mx32api_open) {
-		FIL *fp = app_malloc(sizeof(FIL));
-		int r = f_open(fp,p[1]+ds_base,p[2]);
-		p[15] = r != FR_OK ? -1 : fp;
-		if(r != FR_OK) app_free(fp);
-		api_errno = r;
+		int i;
+		for(i = 0; i < 8; i++) {
+			if(task->fhandle[i] == 0) break;
+		}
+		if(i != 8) {
+			FIL *fp = app_malloc(sizeof(FIL));
+			int r = f_open(fp,p[1]+ds_base,p[2]);
+			p[15] = r != FR_OK ? -1 : fp;
+			if(r != FR_OK) app_free(fp);
+			api_errno = r;
+			task->fhandle[i] = fp;
+		} else {
+			p[15] = -1;
+			api_errno = -1;
+		}
 	} else if(id == mx32api_close) {
 		FIL *fp = (FIL *)p[1];
 		int r = f_close(fp);
+		int i;
+		
+		for(i = 0; i < 8; i++) {
+			if(task->fhandle[i] == fp) task->fhandle[i] = 0;
+		}
+		
 		api_errno = r;
 		p[15] = r;
 		app_free(fp);
@@ -563,6 +789,22 @@ int *microx_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, i
 		p[15] = app_malloc(p[1]);
 	} else if(id == mx32api_free) {
 		p[15] = app_free(p[1]);
+	} else if(id == mx32api_createwindow) {
+		struct SHEET *sht = sheet_alloc(shtctl);
+		sheet_setbuf(sht, (unsigned int *)(((unsigned int *)p)[1] + ds_base), p[2], p[3], p[4]);
+		
+		printf("%08x %d %d %d %s\n",p[1],p[2],p[3],p[4],p[5] + ds_base);
+		
+		make_window(sht, p[5] + ds_base);
+		
+		sheet_slide(sht,32,32);
+		sheet_updown(sht, shtctl->top);
+		
+		sht->task = task;
+		sht->flags |= 0x10;
+		sht->flag2 = 0;
+		
+		p[15] = sht;
 	}
 	
 	return 0;
@@ -578,7 +820,7 @@ FILE *__open(char *path, char *mode)
 	if(strchr(mode,'r')) m |= FA_READ;
 	if(strchr(mode,'w')) m |= FA_WRITE;
 	
-	printk("%02x\n",m);
+	//printk("%02x\n",m);
 	
 	f->obj = (FIL *)malloc(sizeof(FIL));
 	

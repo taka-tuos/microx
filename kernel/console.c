@@ -7,6 +7,8 @@
 
 extern MULTIBOOT_INFO *mboot_info;
 
+int MAX_Y, MAX_X;
+
 const unsigned int table_rgb16[16 * 3] = {
 	0x000000,
 	0x0000aa,
@@ -50,7 +52,7 @@ void cons_putchar_raw(int x, int y, int f, int b, int c)
 	for(int i = 0; i < 16; i++) {
 		unsigned char d = vga_font[c*16+i];
 		for(int j = 0; j < 8; j++) {
-			fbg[(y*16+i)*640+(x*8+j)] = (d & (0x80 >> j)) ? fc : bc;
+			fbg[(y*16+i)*(mboot_info->framebuffer_width)+(x*8+j)] = (d & (0x80 >> j)) ? fc : bc;
 		}
 	}
 }

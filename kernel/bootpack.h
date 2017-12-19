@@ -9,6 +9,7 @@ void io_stihlt(void);
 void asm_inthandler07(void);
 void asm_inthandler20(void);
 void asm_inthandler21(void);
+void asm_inthandler2c(void);
 int io_load_eflags(void);
 void io_store_eflags(int eflags);
 void farjmp(int eip, int cs);
@@ -125,7 +126,7 @@ struct TASK {
 	int fpu[108 / 4];
 	struct SEGMENT_DESCRIPTOR ldt[2];
 	int ds_base, cs_base, cons_stack;
-	struct FILEHANDLE *fhandle;
+	FIL **fhandle;
 	unsigned char langmode, langbyte1;
 };
 struct TASKLEVEL {
@@ -148,3 +149,21 @@ struct TASK *task_alloc(void);
 void task_run(struct TASK *task, int level, int priority);
 void task_switch(void);
 void task_sleep(struct TASK *task);
+
+/* mouse.c */
+struct MOUSE_DEC {
+	unsigned char buf[3], phase;
+	int x, y, btn;
+};
+void inthandler2c(int *esp);
+void enable_mouse(struct FIFO32 *fifo, int data0, struct MOUSE_DEC *mdec);
+int mouse_decode(struct MOUSE_DEC *mdec, unsigned char dat);
+
+/* graphic.c */
+void boxfill(struct SHEET *sht, int x0, int y0, int x1, int y1, int c);
+void swaprgb(unsigned int *p, int sx, int sy);
+void bdfDot(int x, int y, int c);
+void change_wtitle8(struct SHEET *sht, char act);
+void make_window(struct SHEET *sht_win, char *title);
+extern struct SHEET *bdfFB;
+extern int bdfColor;

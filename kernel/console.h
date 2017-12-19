@@ -1,9 +1,8 @@
 #ifndef __CONSOLE__
 #define __CONSOLE__
 
-#define VRAM				0xb8000
-#define	MAX_Y				30
-#define	MAX_X				80
+extern int MAX_Y;
+extern int MAX_X;
 #define	MAX_XY				(MAX_X*MAX_Y)
 
 struct CONSOLE {

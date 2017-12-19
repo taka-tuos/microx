@@ -62,6 +62,11 @@ int x32_GetChar();
 void x32_Exit();
 void x32_PutString(char *s);
 
+void *x32_Malloc(int siz);
+void x32_Free(void *ptr);
+
+int x32_CreateWindow(void *buf, int w, int h, int inv, char *title);
+
 int x32_Errno();
 
 void x32_ApiCall(int *p);
@@ -85,6 +90,7 @@ enum {
 	mx32api_errno,
 	mx32api_malloc,
 	mx32api_free,
+	mx32api_createwindow,
 };
 
 enum {

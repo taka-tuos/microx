@@ -1,7 +1,24 @@
 #include <sys/api.h>
 #include <stdio.h>
 
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_NO_SIMD
+#include "stb_image.h"
+
+int pow(int x, int n)
+{
+	if(n == 2) return x*x;
+	return pow(x,n-1); 
+}
+
+double ldexp(double x, int exp)
+{
+	return x * pow(2,exp);
+}
+
 //unsigned char fb[640*480/2];
+
+//int buf[320*240];
 
 int main(void)
 {
@@ -51,14 +68,31 @@ int main(void)
 	
 	//f_closedir(&Dir);
 	
-	FILE *fp;
+	/*FILE *fp;
 	char s[256];
 	fp = fopen("README.MD","rb");
 	
 	while(!feof(fp)) puts(fgets(s,256,fp));
 	fclose(fp);
 	
-	printf("END\n");
+	printf("END\n");*/
+	
+	//void *buf = x32_Malloc(256*32*4);
+	int buf[300*300];
+	
+	x32_CreateWindow(buf, 300, 300, -1, "init.eim");
+	
+	//int w,h,b;
+	
+	//int *p = (int *)stbi_load("pic.png", &w, &h, &b, 4);
+	
+	/*for(int y = 0; y < 256; y++) {
+		for(int x = 0; x < 256; x++) {
+			buf[(y+20) * 300 + (x+20)] = p[y * 256 + x];
+		}
+	}*/
+	
+	while(1);
 	
 	//for(int i = 0;; i++) xprintf("scroll!! %d\n",i);
 	
