@@ -78,18 +78,28 @@ static int printk(char *format, ...)
 
 static int __pit_count(void)
 {
-	int lo = inb(0x0041);
-	int hi = inb(0x0041);
+	outb(0x43,0);
+	int lo = inb(0x0042);
+	int hi = inb(0x0042);
 	
 	return (hi << 8) | lo;
 }
 
+static void __pit_count_set(int val)
+{
+	outb(0x42,val&0xff);
+	outb(0x42,val>>8);
+}
+
+
 static void wait_loop_usec(int usec)
 {
-	unsigned int old = timer_getticks();
-	unsigned int end = old + (usec / 1000);
+	usec = (usec * 1194 + 500) / 1000;
 
-	while (timer_getticks() <= end) __asm__ __volatile__("nop\n\t");
+	while (usec--) {
+		unsigned int old = __pit_count();
+		while(old == __pit_count());
+	}
 }
 /*
 static FILE *fopen(const char *path, const char *mode)

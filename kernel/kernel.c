@@ -21,6 +21,7 @@
 struct CONSOLE *cons;
 
 BDF_FONT *bdf;
+BDF_FONT *bdfj;
 
 MULTIBOOT_INFO *mboot_info;
 
@@ -285,6 +286,8 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 	
 	cons_initalize(cons);
 	
+	graphic_init();
+	
 	//set_palette(0,16,table_rgb);
 	
 	find_pci_device();
@@ -294,7 +297,10 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 	
 	f_mount(&fs,"",1);
 	
+	printf("Loading ASCII BDF font...\n");
 	bdf = bdfReadPath("6x12.bdf");
+	printf("Loading JIS BDF font...\n");
+	bdfj = bdfReadPath("k12.bdf");
 	
 	bdfSetDrawingFunction(bdfDot);
 	
@@ -409,6 +415,7 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 		for(int l = 0; l < 1024; l++) fifo_list[t][l] = 0;
 	
 	fork("init.eim");
+	fork("init.eim");
 	
 	int ps2_skip = 0;
 	int ps2_state = 0;
@@ -517,7 +524,19 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 					ps2_state &= ~MODIFIER;
 				}
 				
-				struct FIFO32 **fp = fifo_list[FIFOTYPE_KEYBOARD];
+				struct FIFO32 *fifo = &key_win->task->fifo;
+				char *p = esc;
+				if(!fifo->task->flags) continue;
+				while(*p && p) {
+					fifo32_put(fifo, FIFOTYPE_KEYBOARD);
+					fifo32_put(fifo, *p++);
+				}
+				if(c) {
+					fifo32_put(fifo, FIFOTYPE_KEYBOARD);
+					fifo32_put(fifo, c);
+				}
+				
+				/*struct FIFO32 **fp = fifo_list[FIFOTYPE_KEYBOARD];
 				for(i = 0; i < 1024; i++) {
 					if(fp[i]) {
 						struct FIFO32 *fifo = fp[i];
@@ -532,7 +551,7 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 							fifo32_put(fifo, c);
 						}
 					}
-				}
+				}*/
 				
 				// CNS 421
 				key_leds = 0;
@@ -805,7 +824,19 @@ int *microx_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, i
 		sht->flag2 = 0;
 		
 		p[15] = sht;
+	} else if(id == mx32api_closewindow) {
+		struct SHEET *sht = p[1];
+		sheet_free(sht);
+	} else if(id == mx32api_textout) {
+		struct SHEET *sht = p[1];
+		textout(sht,p[2],p[3],p[4],p[5] + ds_base);
+	} else if(id == mx32api_sleep) {
+		task_sleep(task);
+	} else if(id == mx32api_refreshwindow) {
+		struct SHEET *sht = p[1];
+		sheet_refresh(sht,p[2],p[3],p[4],p[5]);
 	}
+	
 	
 	return 0;
 }
@@ -829,6 +860,20 @@ FILE *__open(char *path, char *mode)
 	f_open((FIL *)f->obj,path,m);
 	
 	return f;
+}
+
+int *inthandler0c(int *esp) {
+	struct TASK *task = task_now();
+	printf("\nINT 0C :\n Stack Exception.\n");
+	printf("EIP = %08X\n", esp[11]);
+	return &(task->tss.esp0); /* 異常終了させる */
+}
+
+int *inthandler0d(int *esp) {
+	struct TASK *task = task_now();
+	printf("\nINT 0D :\n General Protected Exception.\n");
+	printf("EIP = %08X\n", esp[11]);
+	return &(task->tss.esp0); /* 異常終了させる */
 }
 
 size_t __write(FILE* instance, const char *bp, size_t n);

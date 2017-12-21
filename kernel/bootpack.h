@@ -1,5 +1,6 @@
 #include "memory.h"
 #include "multiboot.h"
+#include "ff.h"
 
 /* multiboot.S */
 void io_hlt(void);
@@ -10,6 +11,8 @@ void asm_inthandler07(void);
 void asm_inthandler20(void);
 void asm_inthandler21(void);
 void asm_inthandler2c(void);
+void asm_inthandler0c(void);
+void asm_inthandler0d(void);
 int io_load_eflags(void);
 void io_store_eflags(int eflags);
 void farjmp(int eip, int cs);
@@ -165,5 +168,7 @@ void swaprgb(unsigned int *p, int sx, int sy);
 void bdfDot(int x, int y, int c);
 void change_wtitle8(struct SHEET *sht, char act);
 void make_window(struct SHEET *sht_win, char *title);
+void textout(struct SHEET *sht, int x, int y, int c, char *s);
+void graphic_init();
 extern struct SHEET *bdfFB;
 extern int bdfColor;

@@ -77,9 +77,9 @@ DRESULT disk_read (
 {
 	if(pdrv >= 2 || ldrv[pdrv] < 0) return RES_PARERR;
 	int i;
-	for(i = 0; i < count; i++) {
-		if(ata_dev.read(ldrv[pdrv],sector+i,buff+i*512,256) < 0) return RES_PARERR;
-	}
+	//for(i = 0; i < count; i++) {
+		if(ata_dev.read(ldrv[pdrv],sector,buff,256*count) < 0) return RES_PARERR;
+	//}
 
 	return RES_OK;
 }
@@ -99,9 +99,9 @@ DRESULT disk_write (
 {
 	if(pdrv >= 2 || ldrv[pdrv] < 0) return RES_PARERR;
 	int i;
-	for(i = 0; i < count; i++) {
-		if(ata_dev.write(ldrv[pdrv],sector+i,buff+i*512,256) < 0) return RES_PARERR;
-	}
+	//for(i = 0; i < count; i++) {
+		if(ata_dev.write(ldrv[pdrv],sector,buff,256*count) < 0) return RES_PARERR;
+	//}
 
 	return RES_OK;
 }

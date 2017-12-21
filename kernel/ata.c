@@ -72,7 +72,7 @@ static bool do_identify_device(int device, sector_t *buf);
 static void do_soft_reset(int device);
 static bool initialize_common(int device);
 static bool initialize_ata(void);
-static bool sector_rw_common(uint8_t cmd, int device, uint32_t sector);
+static bool sector_rw_common(uint8_t cmd, int device, uint32_t sector, uint32_t count);
 static void finish_sector_rw(void);
 
 typedef union block_data_ {
@@ -153,7 +153,7 @@ int write_sector(int device, uint32_t sector,
 	bool ret;
 	size_t i;
 
-	ret = sector_rw_common(PIO_SECTOR_WRITE_CMD, device, sector);
+	ret = sector_rw_common(PIO_SECTOR_WRITE_CMD, device, sector, buf_size >> 8);
 	if (!ret)
 		return -1;
 
@@ -181,12 +181,12 @@ int read_sector(int device, uint32_t sector,
 
 	//printk("DEVICE %d LBA 0x%08x READ\n", device, sector);
 	
-	if (buf_size != 256) {
+	/*if (buf_size != 256) {
 		printk("buf_size isn't 256\n");
 		while (1);
-	}
+	}*/
 		
-	ret = sector_rw_common(PIO_SECTOR_READ_CMD, device, sector);
+	ret = sector_rw_common(PIO_SECTOR_READ_CMD, device, sector, buf_size >> 8);
 	if (!ret)
 		return -1;
 
@@ -460,7 +460,7 @@ static bool wait_until_device_is_ready(int device)
  * @param sector number.
  * @return true if success.
  */
-static bool sector_rw_common(uint8_t cmd, int device, uint32_t sector)
+static bool sector_rw_common(uint8_t cmd, int device, uint32_t sector, uint32_t count)
 {
 	bool b = false;
 	uint8_t status;
@@ -489,7 +489,7 @@ static bool sector_rw_common(uint8_t cmd, int device, uint32_t sector)
 	outb(SECTOR_NUMBER_REGISTER, sector & 0xff);
 	outb(CYLINDER_LOW_REGISTER, (sector >> 8) & 0xff);
 	outb(CYLINDER_HIGH_REGISTER, (sector >> 16) & 0xff);
-	outb(SECTOR_COUNT_REGISTER, 1);
+	outb(SECTOR_COUNT_REGISTER, count);
 
 #if 0
 	printk("device:0x%x secnum:0x%x low:0x%x high:0x%x head:0x%x\n",

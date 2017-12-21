@@ -50,7 +50,7 @@ void x32_Fifo32Put(int data)
 int x32_GetChar()
 {
 	while(1) {
-		while(x32_Fifo32Status() < 2);
+		while(x32_Fifo32Status() < 2) x32_Sleep();
 		if(x32_Fifo32Get() == 0) {
 			return x32_Fifo32Get();
 		}
@@ -167,6 +167,45 @@ int x32_CreateWindow(void *buf, int w, int h, int inv, char *title)
 	p[5] = title;
 	x32_ApiCall(p);
 	return p[15];
+}
+
+void x32_CloseWindow(int win)
+{
+	int p[32];
+	p[0] = mx32api_closewindow;
+	p[1] = win;
+	x32_ApiCall(p);
+}
+
+void x32_TextOut(int win, int x, int y, int c, char *s)
+{
+	int p[32];
+	p[0] = mx32api_textout;
+	p[1] = win;
+	p[2] = x;
+	p[3] = y;
+	p[4] = c;
+	p[5] = s;
+	x32_ApiCall(p);
+}
+
+void x32_Sleep()
+{
+	int p[32];
+	p[0] = mx32api_sleep;
+	x32_ApiCall(p);
+}
+
+void x32_RefreshWindow(int win, int x0, int y0, int x1, int y1)
+{
+	int p[32];
+	p[0] = mx32api_refreshwindow;
+	p[1] = win;
+	p[2] = x0;
+	p[3] = y0;
+	p[4] = x1;
+	p[5] = y1;
+	x32_ApiCall(p);
 }
 
 /* libc wrapper */

@@ -4,7 +4,7 @@
 .extern _kernel_entry
 .extern microx_api
 
-.extern inthandler20, inthandler21, inthandler2c, inthandler07
+.extern inthandler20, inthandler21, inthandler2c, inthandler07, inthandler0c, inthandler0d
 
 .section .bss
 .align 16
@@ -57,7 +57,7 @@ loop_infinite:
 .global io_out8, io_out16, io_out32
 .global io_load_eflags, io_store_eflags
 .global store_cr0, load_cr0
-.global asm_inthandler21, asm_inthandler20, asm_inthandler2c
+.global asm_inthandler21, asm_inthandler20, asm_inthandler2c, asm_inthandler0c, asm_inthandler0d
 .global io_hlt, io_cli, io_sti, io_stihlt
 .global io_load_eflags, io_store_eflags
 .global load_tr, farjmp
@@ -155,6 +155,46 @@ asm_inthandler2c:
 	popa
 	popw	%ds
 	popw	%es
+	iret
+
+asm_inthandler0c:
+	sti
+	push %es
+	push %ds
+	pusha
+	mov %esp, %eax
+	push %eax
+	mov %ss, %ax
+	mov %ax, %ds
+	mov %ax, %es
+	call inthandler0c
+	cmp $0, %eax
+	jne asm_end_app
+	pop %eax
+	popa
+	pop %ds
+	pop %es
+	add $4, %esp
+	iret
+
+asm_inthandler0d:
+	sti
+	push %es
+	push %ds
+	pusha
+	mov %esp, %eax
+	push %eax
+	mov %ss, %ax
+	mov %ax, %ds
+	mov %ax, %es
+	call inthandler0d
+	cmp $0, %eax
+	jne asm_end_app
+	pop %eax
+	popa
+	pop %ds
+	pop %es
+	add $4, %esp
 	iret
 
 asm_microx_api: 

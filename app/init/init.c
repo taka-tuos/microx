@@ -16,6 +16,23 @@ double ldexp(double x, int exp)
 	return x * pow(2,exp);
 }
 
+void swaprgb(unsigned int *p, int sx, int sy)
+{
+	int x, y;
+	
+	for(y = 0; y < sy; y++) {
+		for(x = 0; x < sx; x++) {
+			int c = p[y * sx + x];
+			int a = (c >> 24) & 0xff;
+			int r = (c >> 16) & 0xff;
+			int g = (c >>  8) & 0xff;
+			int b = (c >>  0) & 0xff;
+			
+			p[y * sx + x] = (a << 24) | (b << 16) | (g << 8) | r;
+		}
+	}
+}
+
 //unsigned char fb[640*480/2];
 
 //int buf[320*240];
@@ -80,19 +97,41 @@ int main(void)
 	//void *buf = x32_Malloc(256*32*4);
 	int buf[300*300];
 	
-	x32_CreateWindow(buf, 300, 300, -1, "init.eim");
+	int win = x32_CreateWindow(buf, 300, 300, -1, "init.eim 日本語テスト");
 	
-	//int w,h,b;
+	int w,h,b;
 	
-	//int *p = (int *)stbi_load("pic.png", &w, &h, &b, 4);
+	unsigned int *p = (unsigned int *)stbi_load("pic.png", &w, &h, &b, 4);
 	
-	/*for(int y = 0; y < 256; y++) {
-		for(int x = 0; x < 256; x++) {
-			buf[(y+20) * 300 + (x+20)] = p[y * 256 + x];
+	printf("%08x\n",p);
+	
+	swaprgb(p,w,h);
+	
+	for(int y = 0; y < h; y++) {
+		for(int x = 0; x < w; x++) {
+			buf[(y+30) * 300 + (x+20)] = p[y * w + x];
 		}
-	}*/
+	}
 	
-	while(1);
+	x32_RefreshWindow(win, 20, 30, 256+20, 256+30);
+	
+	while(1) {
+		int ch = x32_GetChar();
+		for(int y = 0; y < 32; y++) {
+			for(int x = 0; x < 32; x++) {
+				buf[(y+30) * 300 + (x+20)] = 0;
+			}
+		}
+		
+		char sz[2];
+		
+		sz[0] = ch;
+		sz[1] = 0;
+		
+		x32_TextOut(win, 20, 30, 0xffffff, sz);
+		
+		x32_RefreshWindow(win, 20, 30, 32+20, 32+30);
+	}
 	
 	//for(int i = 0;; i++) xprintf("scroll!! %d\n",i);
 	

@@ -66,6 +66,10 @@ void *x32_Malloc(int siz);
 void x32_Free(void *ptr);
 
 int x32_CreateWindow(void *buf, int w, int h, int inv, char *title);
+void x32_CloseWindow(int win);
+void x32_TextOut(int win, int x, int y, int c, char *s);
+void x32_Sleep();
+void x32_RefreshWindow(int win, int x0, int y0, int x1, int y1);
 
 int x32_Errno();
 
@@ -91,6 +95,10 @@ enum {
 	mx32api_malloc,
 	mx32api_free,
 	mx32api_createwindow,
+	mx32api_closewindow,
+	mx32api_textout,
+	mx32api_sleep,
+	mx32api_refreshwindow,
 };
 
 enum {
