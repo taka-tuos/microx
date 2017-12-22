@@ -170,7 +170,9 @@ void fork_task(char *path)
 				q[esp + i] = p[dathrb + i];
 			}
 			
+			task->isapp = 1;
 			start_app(0x1b, 0 * 8 + 4, esp, 1 * 8 + 4, &(task->tss.esp0));
+			task->isapp = 0;
 			
 			struct SHEET *sht;
 	
@@ -301,6 +303,8 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 	bdf = bdfReadPath("6x12.bdf");
 	printf("Loading JIS BDF font...\n");
 	bdfj = bdfReadPath("k12.bdf");
+	
+	cons_initalize(cons);
 	
 	bdfSetDrawingFunction(bdfDot);
 	
@@ -812,7 +816,7 @@ int *microx_api(int edi, int esi, int ebp, int esp, int ebx, int edx, int ecx, i
 		struct SHEET *sht = sheet_alloc(shtctl);
 		sheet_setbuf(sht, (unsigned int *)(((unsigned int *)p)[1] + ds_base), p[2], p[3], p[4]);
 		
-		printf("%08x %d %d %d %s\n",p[1],p[2],p[3],p[4],p[5] + ds_base);
+		//printf("%08x %d %d %d %s\n",p[1],p[2],p[3],p[4],p[5] + ds_base);
 		
 		make_window(sht, p[5] + ds_base);
 		
@@ -866,6 +870,10 @@ int *inthandler0c(int *esp) {
 	struct TASK *task = task_now();
 	printf("\nINT 0C :\n Stack Exception.\n");
 	printf("EIP = %08X\n", esp[11]);
+	if(!task->isapp) {
+		printf("*FATAL* IN OS!!\n");
+		while(1);
+	}
 	return &(task->tss.esp0); /* 異常終了させる */
 }
 
@@ -873,6 +881,10 @@ int *inthandler0d(int *esp) {
 	struct TASK *task = task_now();
 	printf("\nINT 0D :\n General Protected Exception.\n");
 	printf("EIP = %08X\n", esp[11]);
+	if(!task->isapp) {
+		printf("*FATAL* IN OS!!\n");
+		while(1);
+	}
 	return &(task->tss.esp0); /* 異常終了させる */
 }
 

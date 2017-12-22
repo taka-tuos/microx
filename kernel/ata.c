@@ -14,8 +14,8 @@
 #define ALTERNATE_STATUS_REGISTER 0x03f6
 #define DEVICE_CONTROL_REGISTER   0x03f6
 
-#define PIO_SECTOR_WRITE_CMD 0x30
-#define PIO_SECTOR_READ_CMD  0x20
+#define PIO_SECTOR_WRITE_CMD 0x34
+#define PIO_SECTOR_READ_CMD  0x24
 
 // Max logical sector number.
 static uint32_t max_logical_sector_num[] = { 0, 0 };
@@ -29,6 +29,9 @@ static int read_sector(int device, uint32_t sector,
 		       sector_t *buf,	size_t buf_size);
 static int write_sector(int device, uint32_t sector, 
 			sector_t *buf,	size_t buf_size);
+			
+extern void io_cli(void);
+extern void io_sti(void);
 
 // For find IDE interface.
 static struct pci_device_info ata_info[] = {
@@ -152,6 +155,8 @@ int write_sector(int device, uint32_t sector,
 {
 	bool ret;
 	size_t i;
+	
+	io_cli();
 
 	ret = sector_rw_common(PIO_SECTOR_WRITE_CMD, device, sector, buf_size >> 8);
 	if (!ret)
@@ -161,6 +166,8 @@ int write_sector(int device, uint32_t sector,
 
 	for (i = 0; i < buf_size; i++) 
 		outw(DATA_REGISTER, buf[i]);
+		
+	io_sti();
 
 	return 0;
 }
@@ -178,6 +185,8 @@ int read_sector(int device, uint32_t sector,
 {
 	bool ret;
 	size_t i;
+	
+	io_cli();
 
 	//printk("DEVICE %d LBA 0x%08x READ\n", device, sector);
 	
@@ -201,6 +210,8 @@ int read_sector(int device, uint32_t sector,
 	}*/
 
 	finish_sector_rw();
+	
+	io_sti();
 
 	return 0;
 }
@@ -281,6 +292,7 @@ static bool wait_until_BSY_and_DRQ_are_zero(uint16_t port)
 		bsy = (data >> 7) & 0x01;
 		drq = (data >> 3) & 0x01;
 		i++;
+		if(!(!bsy && !drq)) wait_loop_usec(5);
 	} while (!(!bsy && !drq) && i < 1000);
 
 	return (bsy == 0 && drq == 0) ? true : false;
@@ -296,11 +308,14 @@ static bool wait_until_BSY_is_zero(uint16_t port)
 	uint8_t data = 0xff;
 	uint8_t bsy;
 	int i = 0;
+	
+	i = 0;
 
 	do {
 		data = inb(port);
 		bsy = (data >> 7) & 0x01;
 		i++;
+		if(bsy) wait_loop_usec(5);
 	} while (bsy && i < 1000);
 
 	return (bsy == 0) ? true : false;
@@ -443,7 +458,7 @@ static bool wait_until_device_is_ready(int device)
 	int i;
 	bool b = false;
 
-	for (i = 0; i < 5; i++) {
+	for (i = 0; i < 1000; i++) {
 		b = do_device_selection_protocol(device);
 		if (b)
 			break;
@@ -485,11 +500,21 @@ static bool sector_rw_common(uint8_t cmd, int device, uint32_t sector, uint32_t 
 	outb(FEATURES_REGISTER, 0x00);
 
 	// Set Logical Sector.
-	outb(DEVICE_HEAD_REGISTER, ((sector >> 24) & 0x0f) | 0xe0 | (device << 4));
+	/*outb(DEVICE_HEAD_REGISTER, ((sector >> 24) & 0x0f) | 0xe0 | (device << 4));
 	outb(SECTOR_NUMBER_REGISTER, sector & 0xff);
 	outb(CYLINDER_LOW_REGISTER, (sector >> 8) & 0xff);
 	outb(CYLINDER_HIGH_REGISTER, (sector >> 16) & 0xff);
-	outb(SECTOR_COUNT_REGISTER, count);
+	outb(SECTOR_COUNT_REGISTER, count);*/
+	
+	outb(DEVICE_HEAD_REGISTER, 0x40 | (device << 4));
+	outb(SECTOR_COUNT_REGISTER, count >> 8);
+	outb(SECTOR_NUMBER_REGISTER, (sector >> 24) & 0xff);
+	outb(CYLINDER_LOW_REGISTER, 0);
+	outb(CYLINDER_HIGH_REGISTER, 0);
+	outb(SECTOR_COUNT_REGISTER, count & 0xff);
+	outb(SECTOR_NUMBER_REGISTER, sector & 0xff);
+	outb(CYLINDER_LOW_REGISTER, (sector >> 8) & 0xff);
+	outb(CYLINDER_HIGH_REGISTER, (sector >> 16) & 0xff);
 
 #if 0
 	printk("device:0x%x secnum:0x%x low:0x%x high:0x%x head:0x%x\n",
@@ -513,6 +538,7 @@ static bool sector_rw_common(uint8_t cmd, int device, uint32_t sector, uint32_t 
 	inb(ALTERNATE_STATUS_REGISTER);
 
 read_status_register_again:
+	wait_loop_usec(5);
 	status = inb(STATUS_REGISTER);
 
 	if (is_error(status)) {
@@ -522,7 +548,7 @@ read_status_register_again:
 	}
 	
 	if (!is_drq_active(status)) {
-		if (loop > 5) {
+		if (loop > 32) {
 			printk("DRQ didn't be active\n");
 			return false;
 		}

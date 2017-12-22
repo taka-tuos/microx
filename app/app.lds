@@ -14,7 +14,7 @@ SECTIONS
         LONG(LOADADDR(.data)+SIZEOF(.data))					/* 32 : heap領域（malloc領域）開始アドレス */
     }
 
-    .text : { *(.text) }
+    .text : { *(.text*) }
 
     .data 2048 * 1024 : AT ( ADDR(.text) + SIZEOF(.text) ) {
         *(.data)

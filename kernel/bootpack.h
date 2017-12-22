@@ -130,7 +130,7 @@ struct TASK {
 	struct SEGMENT_DESCRIPTOR ldt[2];
 	int ds_base, cs_base, cons_stack;
 	FIL **fhandle;
-	unsigned char langmode, langbyte1;
+	unsigned char langmode, langbyte1, isapp;
 };
 struct TASKLEVEL {
 	int running; /* 動作しているタスクの数 */

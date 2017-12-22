@@ -78,74 +78,22 @@ static int printk(char *format, ...)
 
 static int __pit_count(void)
 {
-	outb(0x43,0);
-	int lo = inb(0x0042);
-	int hi = inb(0x0042);
+	outb(0x43,0x80);
+	int lo = inb(0x42);
+	int hi = inb(0x42);
 	
 	return (hi << 8) | lo;
 }
-
-static void __pit_count_set(int val)
-{
-	outb(0x42,val&0xff);
-	outb(0x42,val>>8);
-}
-
 
 static void wait_loop_usec(int usec)
 {
 	usec = (usec * 1194 + 500) / 1000;
 
-	while (usec--) {
+	while(usec) {
 		unsigned int old = __pit_count();
-		while(old == __pit_count());
+		while(old == __pit_count()) asm volatile("nop\n\t");
+		usec--;
 	}
 }
-/*
-static FILE *fopen(const char *path, const char *mode)
-{
-	BYTE modeb = *mode == 'r' ? FA_READ : FA_WRITE;
-	FILE *fp = kmalloc(sizeof(FILE));
-	
-	f_open(fp,path,modeb);
-	
-	return fp;
-}
-
-static void fclose(FILE *fp)
-{
-	f_close(fp);
-	
-	kfree(fp);
-}
-
-static void fseek(FILE *fp, int ofs, int org)
-{
-	int fofs = 0;
-	switch(org) {
-	case SEEK_CUR:
-		fofs = f_tell(fp) + ofs;
-		break;
-	case SEEK_END:
-		fofs = f_size(fp) - ofs;
-		break;
-	}
-	
-	f_lseek(fp, fofs);
-}
-
-static int ftell(FILE *fp)
-{
-	return f_tell(fp);
-}
-
-static int fread(void *p, int siz1, int siz2, FILE *fp)
-{
-	UINT br;
-	
-	f_read(fp, p, siz1*siz2,&br);
-	
-	return br;
-}*/
 
 #endif

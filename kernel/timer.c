@@ -4,6 +4,7 @@
 
 #define PIT_CTRL	0x0043
 #define PIT_CNT0	0x0040
+#define PIT_CNT2	0x0042
 
 struct TIMERCTL timerctl;
 
@@ -15,9 +16,11 @@ void init_pit(void)
 	int i;
 	struct TIMER *t;
 	io_out8(PIT_CTRL, 0x34);
-	io_out8(PIT_CTRL, 0x34 | 0x80);
+	io_out8(PIT_CTRL, 0xb4);
 	io_out8(PIT_CNT0, 0x9c);
 	io_out8(PIT_CNT0, 0x2e);
+	io_out8(PIT_CNT2, 0xff);
+	io_out8(PIT_CNT2, 0xff);
 	timerctl.count = 0;
 	for (i = 0; i < MAX_TIMER; i++) {
 		timerctl.timers0[i].flags = 0; /* 未使用 */
