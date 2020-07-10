@@ -96,4 +96,55 @@ static void wait_loop_usec(int usec)
 	}
 }
 
+static void sleep(int msec)
+{
+	wait_loop_usec(msec * 1000);
+}
+
+static void insl(uint16_t port, uint32_t buffer, unsigned long count)
+{
+	uint32_t *p = (uint32_t *)buffer;
+	
+	while(count) {
+		*p = inl(port);
+		p++;
+		count--;
+	}
+	//asm("cld; rep; insl" :: "D" (buffer), "d" (port), "c" (count));
+}
+
+static void insw(uint16_t port, uint32_t buffer, unsigned long count)
+{
+	uint16_t *p = (uint16_t *)buffer;
+	
+	while(count) {
+		*p = inw(port);
+		p++;
+		count--;
+	}
+	//asm("cld; rep; insl" :: "D" (buffer), "d" (port), "c" (count));
+}
+
+static void outsw(uint16_t port, uint32_t buffer, unsigned long count)
+{
+	uint16_t *p = (uint16_t *)buffer;
+	
+	while(count) {
+		outw(port,*p);
+		p++;
+		count--;
+	}
+	//asm("cld; rep; insl" :: "D" (buffer), "d" (port), "c" (count));
+}
+
+static void cli()
+{
+	asm volatile("cli\n\t");
+}
+
+static void sti()
+{
+	asm volatile("sti\n\t");
+}
+
 #endif

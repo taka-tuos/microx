@@ -8,7 +8,12 @@
 /*-----------------------------------------------------------------------*/
 
 #include "diskio.h"		/* FatFs lower layer API */
-#include "ata.h"
+//#include "ata.h"
+#include "ide.h"
+#include "wrapper.h"
+
+extern int enter_diskio(int op, int drv, int secs, int lba, int addr);
+extern void wait_diskio(int id);
 
 enum {
 	cmos_address = 0x70,
@@ -17,7 +22,11 @@ enum {
 
 int inited = -1;
 
-int ldrv[2] = { -1, -1 };
+int ldrv[4] = { -1, -1, -1, -1 };
+
+extern int package[16];
+
+int atomic = 0;
 
 /*-----------------------------------------------------------------------*/
 /* Get Drive Status                                                      */
@@ -27,7 +36,7 @@ DSTATUS disk_status (
 	BYTE pdrv		/* Physical drive nmuber to identify the drive */
 )
 {
-	if(ldrv[pdrv] >= 0) return 0;
+	if(pdrv < 4 && ldrv[pdrv] >= 0) return 0;
 
 	return STA_NOINIT;
 }
@@ -42,13 +51,40 @@ DSTATUS disk_initialize (
 	BYTE pdrv				/* Physical drive nmuber to identify the drive */
 )
 {
-	if(pdrv >= 2) return STA_NOINIT;
+	if(pdrv >= 4) return STA_NOINIT;
 	
-	if(inited < 0) inited = ata_dev.open();
+	while(atomic != 0);
+	atomic++;
 	
-	if(inited <= 0) return STA_NOINIT;
+	if(inited < 0) {
+		//cli();
+		int r = ide_initialize(0x1F0, 0x3F6, 0x170, 0x376, 0x000);
+		//sti();
+		inited = 0;
+		
+		for(int i=0; i<4; i++) {
+			if(r & (1 << i)) {
+				for(int j=0; j<4; j++) {
+					if(ldrv[j] < 0) {
+						ldrv[j] = i;
+						break;
+					}
+				}
+			}
+		}
+		
+		printk("ldrv = ");
+		printk("%d, ",ldrv[0]);
+		printk("%d, ",ldrv[1]);
+		printk("%d, ",ldrv[2]);
+		printk("%d\n",ldrv[3]);
+	}
 	
-	if(inited & 0x01) {
+	atomic--;
+	
+	if(ldrv[pdrv] >= 0) return 0;
+	
+	/*if(inited & 0x01) {
 		ldrv[0] = 0;
 		if(inited & 0x02) {
 			ldrv[1] = 1;
@@ -57,9 +93,9 @@ DSTATUS disk_initialize (
 		ldrv[0] = 1;
 	}
 	
-	if(ldrv[pdrv] < 0) return STA_NOINIT;
+	if(ldrv[pdrv] < 0) return STA_NOINIT;*/
 	
-	return 0;
+	return STA_NOINIT;
 }
 
 
@@ -75,16 +111,33 @@ DRESULT disk_read (
 	UINT count		/* Number of sectors to read */
 )
 {
-	if(pdrv >= 2 || ldrv[pdrv] < 0) return RES_PARERR;
+	//if(pdrv >= 2 || ldrv[pdrv] < 0) return RES_PARERR;
 	int i;
 	//for(i = 0; i < count; i++) {
-		if(ata_dev.read(ldrv[pdrv],sector,buff,256*count) < 0) return RES_PARERR;
+		//if(ata_dev.read(ldrv[pdrv],sector,buff,256*count) < 0) return RES_PARERR;
 	//}
+	
+	if(pdrv >= 4) return RES_PARERR;
+	if(ldrv[pdrv] < 0) return RES_NOTRDY;
+	
+	package[0] = 0;
+	
+	//cli();
+	while(atomic != 0);
+	atomic++;
+	//printk("ENTER READ ATOMIC %08x\n",sector+(DWORD)buff);
+	ide_read_sectors(ldrv[pdrv],count,sector,0,(unsigned int)buff);
+	//printk("LEAVE READ ATOMIC %08x\n",sector+(DWORD)buff);
+	atomic--;
+	//sti();
+	//int id = enter_diskio(0,ldrv[pdrv],count,sector,(unsigned int)buff);
+	//wait_diskio(id);
+	
+	if(package[0] == 1) return RES_NOTRDY;
+	if(package[0] == 2) return RES_PARERR;
 
-	return RES_OK;
+	return 0;
 }
-
-
 
 /*-----------------------------------------------------------------------*/
 /* Write Sector(s)                                                       */
@@ -97,13 +150,28 @@ DRESULT disk_write (
 	UINT count			/* Number of sectors to write */
 )
 {
-	if(pdrv >= 2 || ldrv[pdrv] < 0) return RES_PARERR;
+	//if(pdrv >= 2 || ldrv[pdrv] < 0) return RES_PARERR;
 	int i;
 	//for(i = 0; i < count; i++) {
-		if(ata_dev.write(ldrv[pdrv],sector,buff,256*count) < 0) return RES_PARERR;
+		//if(ata_dev.write(ldrv[pdrv],sector,buff,256*count) < 0) return RES_PARERR;
 	//}
+	
+	if(pdrv >= 4) return RES_PARERR;
+	if(ldrv[pdrv] < 0) return RES_NOTRDY;
+	
+	package[0] = 0;
+	
+	while(atomic != 0);
+	atomic++;
+	//printk("ENTER WRITE ATOMIC %08x\n",sector+(DWORD)buff);
+	ide_write_sectors(ldrv[pdrv],count,sector,0,(unsigned int)buff);
+	//printk("LEAVE WRITE ATOMIC %08x\n",sector+(DWORD)buff);
+	atomic--;
+	
+	if(package[0] == 1) return RES_NOTRDY;
+	if(package[0] == 2) return RES_PARERR;
 
-	return RES_OK;
+	return 0;
 }
 
 

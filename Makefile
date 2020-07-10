@@ -12,11 +12,11 @@ bootcd.iso : core Makefile
 	$(GRUB)  --output=bootcd.iso grub
 
 vfat.img : apps Makefile $(shell find fs_files/ -type f)
-	-$(DEL) vfat.img
-	$(BZIP2) -d -k vfat.img.bz2
+	-$(DEL) vfat.img 
+	dd if=/dev/zero of=vfat.img bs=4M count=64 status=progress
+	mformat -F -t 1024 -h 16 -s 32 -i vfat.img
 	find fs_files/ -type d | cut -d/ -f2-8 | xargs -I{} mmd -i vfat.img {}
 	find fs_files/ -type f | cut -d/ -f2-8 | xargs -I{} mcopy -i vfat.img fs_files/{} ::{}
-
 # commands
 
 apps :
@@ -27,6 +27,7 @@ core :
 
 bootcd :
 	$(MAKE) bootcd.iso
+	-$(RM) vfat.img.lock
 
 hdimage :
 	$(MAKE) vfat.img

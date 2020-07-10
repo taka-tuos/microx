@@ -1,5 +1,5 @@
 #include "multiboot.h"
-#include "ata.h"
+#include "ide.h"
 #include "pci.h"
 #include "memory.h"
 #include "console.h"
@@ -32,6 +32,8 @@ FATFS *ata;
 struct FIFO32 ***fifo_list;
 
 struct SHTCTL *shtctl;
+
+struct DISKIOREQ req_list[2048];
 
 unsigned int mdata[4];
 
@@ -240,6 +242,55 @@ void kill_fork(struct TASK *task)
 	return;
 }
 
+void task_diskio(void)
+{
+	struct TASK *self = task_now();
+	
+	printk("RUN\n");
+	
+	while(1) {
+		for(int i = 0; i < 2048; i++) {
+			struct DISKIOREQ *p = &(req_list[i]);
+			
+			if(p->en) {
+				printk("!!RECV REQ %d!!\n", i);
+				(req_list->op ? ide_write_sectors : ide_read_sectors)(p->drv,p->secs,p->lba,0,p->addr);
+				p->en = 0;
+			}
+		}
+		wait_loop_usec(10);
+	}
+}
+
+int enter_diskio(int op, int drv, int secs, int lba, int addr)
+{
+	for(int i = 0; i < 2048; i++) {
+		struct DISKIOREQ *p = &(req_list[i]);
+		
+		if(p->en == 0) {
+			p->op = op;
+			p->drv = drv;
+			p->secs = secs;
+			p->lba = lba;
+			p->addr = addr;
+			p->en = 1;
+			
+			printk("!!SEND REQ %d!!\n", i);
+			
+			return i;
+		}
+	}
+	
+	return -1;
+}
+
+void wait_diskio(int id)
+{
+	if(id < 0) return;
+	
+	while(req_list[id].en) wait_loop_usec(10);
+}
+
 void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 {
 	struct FIFO32 fifo, keycmd;
@@ -259,7 +310,7 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 	mboot_info = info;
 	
 	MAX_X = info->framebuffer_width / 8;
-	MAX_Y = info->framebuffer_height / 8;
+	MAX_Y = info->framebuffer_height / 16;
 	
 	init_gdtidt(info);
 	init_pic();
@@ -291,9 +342,26 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 	graphic_init();
 	
 	//set_palette(0,16,table_rgb);
+	//find_pci_device();
+	//show_all_pci_device();
+	//init_ata_disk_driver();
 	
-	find_pci_device();
-	init_ata_disk_driver();
+	for(int i=0;i<2048;i++) req_list[i].en = 0;
+	
+	{
+		struct TASK *disktask = task_alloc();
+		int *disk_fifo = (int *) memman_alloc_4k(memman, 2048 * 4);
+		disktask->tss.esp = memman_alloc_4k(memman, 64 * 1024) + 64 * 1024 - 8;
+		disktask->tss.eip = (int) &task_diskio;
+		disktask->tss.es = 1 * 8;
+		disktask->tss.cs = 2 * 8;
+		disktask->tss.ss = 1 * 8;
+		disktask->tss.ds = 1 * 8;
+		disktask->tss.fs = 1 * 8;
+		disktask->tss.gs = 1 * 8;
+		task_run(disktask, 1, 2);
+		fifo32_init(&(disktask->fifo), 2048, disk_fifo, disktask);
+	}
 	
 	ata = &fs;
 	
@@ -325,6 +393,8 @@ void _kernel_entry(UINT32 magic, MULTIBOOT_INFO *info)
 			fbp[i*256+j] = col;
 		}
 	}*/
+	
+	//for(;;);
 	
 	sht_back = sheet_alloc(shtctl);
 	

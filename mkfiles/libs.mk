@@ -11,7 +11,7 @@ default :
 
 $(TARGET).a : $(OBJS) Makefile
 	$(AR) rcs $(TARGET).a $(OBJS)
-	$(COPY) $(TARGET).a ../
+	cp $(TARGET).a ../
 
 # normal rules
 
@@ -24,6 +24,6 @@ $(TARGET).a : $(OBJS) Makefile
 # commands
 
 clean :
-	-$(DEL) *.o
-	-$(DEL) $(TARGET).a
-	-$(DEL) ../$(TARGET).a
+	-$(RM) *.o
+	-$(RM) $(TARGET).a
+	-$(RM) ../$(TARGET).a

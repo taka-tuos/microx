@@ -172,3 +172,8 @@ void textout(struct SHEET *sht, int x, int y, int c, char *s);
 void graphic_init();
 extern struct SHEET *bdfFB;
 extern int bdfColor;
+
+
+struct DISKIOREQ {
+	unsigned int en, op, addr, lba, secs, drv;
+};

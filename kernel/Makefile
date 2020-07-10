@@ -1,4 +1,4 @@
-OBJS_KERNEL = multiboot.o kernel.o ata.o pci.o ff.o diskio.o memory.o console.o timer.o dsctbl.o int.o mtask.o keyboard.o fifo.o mutex.o ffsystem.o sheet.o nvbdflib.o mouse.o graphic.o
+OBJS_KERNEL = multiboot.o kernel.o pci.o ff.o diskio.o memory.o console.o timer.o dsctbl.o int.o mtask.o keyboard.o fifo.o mutex.o ffsystem.o sheet.o nvbdflib.o mouse.o graphic.o ide.o
 
 include ../mkfiles/cflags.mk
 
@@ -26,6 +26,6 @@ kernel.elf : $(OBJS_KERNEL) Makefile
 # commands
 	
 clean :
-	-$(DEL) *.o
-	-$(DEL) *.map
-	-$(DEL) *.elf
+	-$(RM) *.o
+	-$(RM) *.map
+	-$(RM) *.elf
